@@ -1,0 +1,690 @@
+<html>
+<head>
+  <title>Number theory algorithms</title>
+  <link rel="stylesheet" href="yacas.css" TYPE="text/css" MEDIA="screen">
+  <script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
+    });
+  </script>
+  <script type="text/javascript"
+    src="https://c328740.ssl.cf1.rackcdn.com/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+</head>
+<body>
+<a name="c2">
+
+</a>
+<h1>
+2. Number theory algorithms
+</h1>
+This chapter describes the algorithms used for computing various number-theoretic functions.
+We call "number-theoretic" any function that takes integer arguments,
+produces integer values, and is of interest to number theory.
+
+<p> </p>
+
+<p>
+
+<a name="c2s1">
+
+</a>
+<h2>
+<hr>2.1 Euclidean GCD algorithms
+</h2>
+<a name="GCD!binary Euclidean method">
+
+</a>
+The main algorithm for the calculation of the GCD of two integers
+is the binary Euclidean algorithm.
+It is based on the following identities: $\mathrm{ Gcd }\left( a, b\right)  = \mathrm{ Gcd }\left( b, a\right) $,
+$\mathrm{ Gcd }\left( a, b\right)  = \mathrm{ Gcd }\left( a - b, b\right) $, and for odd $b$, $\mathrm{ Gcd }\left( 2 a, b\right)  = \mathrm{ Gcd }\left( a, b\right) $.
+Thus we can produce a sequence of pairs with the same GCD as the original two numbers, and each pair will be at most half the size of the previous pair.
+The number of steps is logarithmic in the number of digits in $a$, $b$.
+The only operations needed for this algorithm are binary shifts and subtractions (no modular division is necessary).
+The low-level function for this is <b><tt>MathGcd</tt></b>.
+
+
+<p>
+To speed up the calculation when one of the numbers is much larger than another, one could use the property $\mathrm{ Gcd }\left( a, b\right)  = \mathrm{ Gcd }\left( a, a\bmod b\right) $.
+This will introduce an additional modular division into the algorithm; this is a slow operation when the numbers are large.
+
+
+<p>
+
+<a name="c2s2">
+
+</a>
+<h2>
+<hr>2.2 Prime numbers: the Miller-Rabin test and its improvements
+</h2>
+<a name="primality testing">
+
+</a>
+Small prime numbers
+
+$p<=65537$
+are simply stored in a precomputed table as an array of bits; the bits corresponding to prime numbers are set to 1.
+This makes primality testing on small numbers very quick.
+This is implemented by the function <b><tt>FastIsPrime</tt></b>.
+
+
+<p>
+Primality of larger numbers is tested by the function <b><tt>IsPrime</tt></b> that uses the
+Miller-Rabin algorithm.
+<h6>Initial implementation and documentation was supplied by Christian Obrecht.</h6>This algorithm is deterministic (guaranteed correct within a certain running time) for
+"small" numbers $n &lt; 3.4\cdot 10 ^{13}$ and probabilistic
+(correct with high probability but not guaranteed) for larger numbers.
+In other words, the Miller-Rabin test
+could sometimes flag a large number $n$ as prime when in fact $n$ is
+composite; but the probability for this to happen can be made extremely
+small. The basic reference is [Rabin 1980].
+We also implemented some of the improvements suggested in [Davenport 1992].
+
+
+<p>
+
+<a name="primality testing!Fermat test">
+
+</a>
+<a name="primality testing!Miller-Rabin algorithm">
+
+</a>
+The idea of the Miller-Rabin algorithm is to improve the Fermat primality test. If $n$ is prime, then for any $x$ we have $\mathrm{ Gcd }\left( n, x\right)  = 1$. Then by Fermat's "little theorem", $x ^{n - 1}\equiv 1\bmod n$. (This is really a simple statement; if $n$ is prime, then $n - 1$ nonzero remainders modulo $n$: 1, 2, ..., $n - 1$ form a cyclic multiplicative group.) Therefore we pick some "base" integer $x$ and compute $x ^{n - 1}\bmod n$; this is a quick computation even if $n$ is large. If this value is not equal to $1$ for some base $x$, then $n$ is definitely not prime.
+However, we cannot test <i>every</i> base $x &lt; n$; instead we test only some $x$, so it may happen that we miss the right values of $x$ that would expose the non-primality of $n$.
+So Fermat's test sometimes fails, i.e. says that $n$ is a prime when $n$ is in fact not a prime.
+Also there are infinitely many integers called "Carmichael numbers" which are not prime but pass the Fermat test for every base.
+
+
+<p>
+The Miller-Rabin algorithm improves on this by using the property that for prime $n$ there are no nontrivial square roots of unity in the ring of integers modulo $n$ (this is Lagrange's theorem). In other words, if $x ^{2}\equiv 1\bmod n$ for some $x$, then $x$ must be equal to $1$ or $ - 1$ modulo $n$. (Since $n - 1$ is equal to $ - 1$ modulo $n$, we have $n - 1$ as a trivial square root of unity modulo $n$.
+Note that even if $n$ is prime there may be nontrivial divisors of $1$, for example, $2\cdot 49\equiv 1\bmod 97$.)
+
+
+<p>
+We can check that $n$ is odd before applying any primality test. (A test $n ^{2}\equiv 1\bmod 24$ guarantees that $n$ is not divisible by $2$ or $3$.
+For large $n$ it is faster to first compute $n\bmod 24$ rather than $n ^{2}$, or test $n$ directly.)
+Then we note that in Fermat's test the number $n - 1$ is certainly a composite number because $n - 1$ is even. So if we first find the largest power of $2$ in $n - 1$ and decompose $n - 1 = 2 ^{r} q$ with $q$ odd, then $x ^{n - 1}\equiv a ^{2 ^{r}}\bmod n$ where $a\equiv x ^{q}\bmod n$. (Here $r\geq 1$ since $n$ is odd.) In other words, the number $x ^{n - 1}\bmod n$ is obtained by repeated squaring of the number $a$.
+We get a sequence of $r$ repeated squares: $a$, $a ^{2}$, ..., $a ^{2 ^{r}}$.
+The last element of this sequence must be $1$ if $n$ passes the Fermat test.
+(If it does not pass, $n$ is definitely a composite number.)
+If $n$ passes the Fermat test, the last-but-one element $a ^{2 ^{r - 1}}$ of the sequence of squares is a square root of unity modulo $n$.
+We can check whether this square root is non-trivial (i.e. not equal to $1$ or $ - 1$ modulo $n$). If it is non-trivial, then $n$ definitely cannot be a prime. If it is trivial and equal to $1$, we can check the preceding element, and so on. If an element is equal to $ - 1$, we cannot say anything, i.e. the test passes ($n$ is "probably a prime").
+
+
+<p>
+This procedure can be summarized like this:
+<ul><li>Find the largest power of </li>$2$ in $n - 1$ and an odd number $q$ such that $n - 1 = 2 ^{r} q$.
+<li>Select the "base number" </li>$x &lt; n$. Compute the sequence $a\equiv x ^{q}\bmod n$, $a ^{2}$, $a ^{4}$, ..., $a ^{2 ^{r}}$ by repeated squaring modulo $n$. This sequence contains at least two elements since $r\geq 1$.
+<li>If </li>$a = 1$ or $a = n - 1$, the test passes on the base number $x$. Otherwise, the test passes if at least one of the elements of the sequence is equal to $n - 1$ and fails if none of them are equal to $n - 1$. 
+This simplified procedure works because the first element that is equal to $1$ <i>must</i> be preceded by a $ - 1$, or else we would find a nontrivial root of unity.
+</ul>
+
+<p>
+Here is a more formal definition.
+An odd integer $n$ is called <i>strongly-probably-prime</i> for base $b$ if
+$b ^{q}\equiv 1\bmod n$
+or
+$b ^{q\cdot 2 ^{i}}\equiv \left( n - 1\right) \bmod n$ for some $i$ such that $0\leq i &lt; r$,
+where $q$ and $r$ are such that $q$ is odd and $n - 1 = q\cdot 2 ^{r}$.
+
+
+<p>
+A practical application of this procedure needs to select particular base numbers. 
+It is advantageous (according to [Pomerance <i>et al.</i> 1980]) to choose <i>prime</i> numbers $b$ as bases, because for a composite base $b = p q$, if $n$ is a strong pseudoprime for both $p$ and $q$, then it is very probable that $n$ is a strong pseudoprime also for $b$, so composite bases rarely give new information.
+
+
+<p>
+An additional check suggested by [Davenport 1992] is activated if $r &gt; 2$ (i.e. if $n\equiv 1\bmod 8$ which is true for only 1/4 of all odd numbers).
+If $i\geq 1$ is found such that $b ^{q\cdot 2 ^{i}}\equiv \left( n - 1\right) \bmod n$, then $b ^{q\cdot 2 ^{i - 1}}$ is a square root of $ - 1$ modulo $n$.
+If $n$ is prime, there may be only two different square roots of $ - 1$.
+Therefore we should store the set of found values of roots of $ - 1$; if there are more than two such roots, then we woill find some roots $s_{1}$, $s_{2}$ of $ - 1$ such that $s_{1} + s_{2}\neq 0\bmod n$.
+But $s_{1} ^{2} - s_{2} ^{2}\equiv 0\bmod n$.
+Therefore $n$ is definitely composite, e.g. $\mathrm{ Gcd }\left( s_{1} + s_{2}, n\right)  &gt; 1$. This check costs very little computational effort but guards against some strong pseudoprimes.
+
+
+<p>
+Yet another small improvement comes from [Damgard <i>et al.</i> 1993].
+They found that the strong primality test sometimes (rarely) passes on
+composite numbers $n$ for more than $\frac{1}{8} $ of all bases $x &lt; n$ if $n$ is such
+that either $3 n + 1$ or $8 n + 1$ is a perfect square, or if $n$ is a
+Carmichael number. Checking Carmichael numbers is slow, but it is easy to show that
+if $n$ is a large enough prime number, then neither $3 n + 1$, nor $8 n + 1$,
+nor any $s n + 1$ with small integer $s$ can be a perfect square.
+[If
+$s n + 1 = r ^{2}$, then $s n = \left( r - 1\right)  \left( r + 1\right) $.]
+Testing for a perfect square is quick
+and does not slow down the algorithm.
+This is however not
+implemented in Yacas because it seems that perfect squares are too rare
+for this improvement to be significant.
+
+
+<p>
+
+<a name="primality testing!strong pseudoprimes">
+
+</a>
+If an integer is not "strongly-probably-prime" for a given base $b$, then it is
+a composite number.
+However, the converse statement is false, i.e. "strongly-probably-prime" numbers can actually be composite.
+Composite strongly-probably-prime numbers for
+base $b$ are called <i>strong pseudoprimes</i> for base $b$. There is a theorem that if $n$ is
+composite, then among all numbers $b$ such that $1 &lt; b &lt; n$, at most one fourth
+are such that $n$ is a strong pseudoprime for base $b$.
+Therefore if $n$ is strongly-probably-prime for many bases, then the probability for $n$ to be composite is very small.
+
+
+<p>
+For numbers less than $B = 34155071728321$, exhaustive
+<h6>And surely exhausting.</h6>computations have shown
+that there are no strong pseudoprimes simultaneously for bases 2, 3, 5, 7, 11, 13
+and 17. This gives a simple and reliable primality test for integers below $B$.
+If $n\geq B$, the Rabin-Miller method consists in checking if $n$ is
+strongly-probably-prime for $k$ base numbers $b$.
+The base numbers are chosen to be consecutive "weak pseudoprimes" that are easy to generate (see below the function <b><tt>NextPseudoPrime</tt></b>).
+
+
+<p>
+
+<a name="primality testing!Miller-Rabin algorithm!choosing the bases">
+
+</a>
+In the implemented routine <b><tt>RabinMiller</tt></b>, the number of bases $k$ is chosen to
+make the probability of erroneously passing the test $p &lt; 10 ^{ - 25}$. (Note that
+this is <i>not</i> the same as the probability to give an incorrect answer,
+because all numbers that do not pass the test are definitely composite.) The
+probability for the test to pass mistakenly on a given number is found as
+follows.
+Suppose the number of bases $k$ is fixed. Then the probability for a
+given composite number to pass the test is less than $p _{f} = 4 ^{ - k}$. The
+probability for a given number $n$ to be prime is roughly $p _{p} = \frac{1}{\ln n} $ and to
+be composite $p _{c} = 1 - \frac{1}{\ln n} $. Prime numbers never fail the test.
+Therefore, the probability for the test to pass is $p _{f} p _{c} + p _{p}$ and the probability to pass erroneously is
+$$p = \frac{p _{f} p _{c}}{p _{f} p _{c} + p _{p}}  &lt; \ln n\cdot 4 ^{ - k}.$$
+To make $p &lt; \epsilon $, it is enough to select $k = \frac{1}{\ln 4}  \left( \ln n - \ln \epsilon \right) $.
+
+
+<p>
+Before calling <b><tt>MillerRabin</tt></b>, the function <b><tt>IsPrime</tt></b> performs two quick
+checks:
+first, for $n\geq 4$ it checks that $n$ is not divisible by 2 or 3 
+(all primes larger than 4 must satisfy this);
+second, for $n &gt; 257$, it checks that $n$ does not contain small prime factors $p\leq 257$.
+This is checked by evaluating the GCD of $n$ with the precomputed product of all primes up to 257.
+The computation of the GCD is quick and saves time in case a
+small prime factor is present.
+
+
+<p>
+
+<a name="NextPrime@\relax <b><tt>NextPrime</tt></b>">
+
+</a>
+There is also a function <b><tt>NextPrime(n)</tt></b> that returns the smallest prime number larger than <b><tt>n</tt></b>. 
+This function uses a sequence 5,7,11,13,... generated by the function <b><tt>NextPseudoPrime</tt></b>.
+This sequence contains numbers not divisible by 2 or 3 (but perhaps divisible by 5,7,...).
+The function <b><tt>NextPseudoPrime</tt></b> is very fast because it does not perform a full primality test.
+
+
+<p>
+The function <b><tt>NextPrime</tt></b> however does check each of these pseudoprimes using <b><tt>IsPrime</tt></b> and finds the first prime number.
+
+
+<p>
+
+<a name="c2s3">
+
+</a>
+<h2>
+<hr>2.3 Factorization of integers
+</h2>
+<a name="factorization of integers">
+
+</a>
+<a name="Factor@\relax <b><tt>Factor</tt></b>">
+
+</a>
+When we find from the primality test that an integer $n$ is composite, we usually do not obtain any factors of $n$.
+Factorization is implemented by functions <b><tt>Factor</tt></b> and <b><tt>Factors</tt></b>.
+Both functions use the same algorithms to find all prime factors of a given integer $n$.
+(Before doing this, the primality checking algorithm is used to detect whether $n$ is a prime number.)
+Factorization consists of repeatedly finding a factor, i.e. an 
+integer $f$ such that $n\bmod f = 0$, and dividing $n$ by $f$.
+(Of course, each fastor $f$ needs to be factorized too.)
+
+
+<p>
+
+<a name="factorization of integers!small prime factors">
+
+</a>
+First we determine whether the number $n$ contains "small" prime
+factors $p\leq 257$. A quick test is to find the GCD of $n$ and the
+product of all primes up to $257$: if the GCD is greater than 1, then
+$n$ has at least one small prime factor. (The product of primes is
+precomputed.) If this is the case, the trial division algorithm is
+used: $n$ is divided by all prime numbers $p\leq 257$ until a factor is
+found. <b><tt>NextPseudoPrime</tt></b> is used to generate the sequence of candidate
+divisors $p$.
+
+
+<p>
+
+<a name="factorization of integers!checking for prime powers">
+
+</a>
+After separating small prime factors, we test whether the number $n$ is an integer power of a prime number, i.e. whether $n = p ^{s}$ for some prime number $p$ and an integer $s\geq 1$. This is tested by the following algorithm. We already know that $n$ is not prime and that $n$ does not contain any small prime factors up to 257. Therefore if $n = p ^{s}$, then $p &gt; 257$ and $2\leq s &lt; s _{0} = \frac{\ln n}{\ln 257} $. In other words, we only need to look for powers not greater than $s _{0}$. This number can be approximated by the "integer logarithm" of $n$ in base 257 (routine <b><tt>IntLog(n, 257)</tt></b>).
+
+
+<p>
+Now we need to check whether $n$ is of the form $p ^{s}$ for $s = 2$, 3, ..., $s _{0}$. Note that if for example $n = p ^{24}$ for some $p$, then the square root of $n$ will already be an integer, $\sqrt{n} = p ^{12}$. Therefore it is enough to test whether $\sqrt[s]{n}$ is an integer for all <i>prime</i> values of $s$ up to $s _{0}$, and then we will definitely discover whether $n$ is a power of some other integer.
+The testing is performed using the integer $n$-th root function <b><tt>IntNthRoot</tt></b> which quickly computes the integer part of $n$-th root of an integer number. If we discover that $n$ has an integer root $p$ of order $s$, we have to check that $p$ itself is a prime power (we use the same algorithm recursively). The number $n$ is a prime power if and only if $p$ is itself a prime power. If we find no integer roots of orders $s\leq s _{0}$, then $n$ is not a prime power.
+
+
+<p>
+
+<a name="factorization of integers!Pollard's "rho" algorithm">
+
+</a>
+If the number $n$ is not a prime power, the Pollard "rho" algorithm is applied [Pollard 1978]. The Pollard "rho" algorithm takes an irreducible polynomial, e.g. $p\left( x\right)  = x ^{2} + 1$ and builds a sequence of integers $x _{k + 1}\equiv p\left( x _{k}\right) \bmod n$, starting from $x _{0} = 2$. For each $k$, the value $x _{2 k} - x _{k}$ is attempted as possibly containing a common factor with $n$. The GCD of $x _{2 k} - x _{k}$ with $n$ is computed, and if $\mathrm{ Gcd }\left( x _{2 k} - x _{k}, n\right)  &gt; 1$, then that GCD value divides $n$.
+
+
+<p>
+The idea behind the "rho" algorithm is to generate an effectively
+random sequence of trial numbers $t _{k}$ that may have a common factor
+with $n$. The efficiency of this algorithm is determined by the size of
+the smallest factor $p$ of $n$. Suppose $p$ is the smallest prime
+factor of $n$ and suppose we generate a random sequence of integers
+$t _{k}$ such that $1\leq t _{k} &lt; n$. It is clear that, on the average, a
+fraction $\frac{1}{p} $ of these integers will be divisible by $p$. Therefore
+(if $t _{k}$ are truly random) we should need on the average $p$ tries
+until we find $t _{k}$ which is accidentally divisible by $p$. In
+practice, of course, we do not use a truly random sequence and the
+number of tries before we find a factor $p$ may be significantly
+different from $p$. The quadratic polynomial seems to help reduce the
+number of tries in most cases.
+
+
+<p>
+But the Pollard "rho" algorithm may actually enter an infinite loop
+when the sequence $x _{k}$ repeats itself without giving any factors of
+$n$. For example, the unmodified "rho" algorithm starting from $x _{0} = 2$
+loops on the number $703$. The loop is detected by comparing $x _{2 k}$ and
+$x _{k}$. When these two quantities become equal to each other for the
+first time, the loop may not yet have occurred so the value of GCD is
+set to 1 and the sequence is continued. But when the equality of
+$x _{2 k}$ and $x _{k}$ occurs many times, it indicates that the algorithm
+has entered a loop. A solution is to randomly choose a different
+starting number $x _{0}$ when a loop occurs and try factoring again, and
+keep trying new random starting numbers between 1 and $n$ until a
+non-looping sequence is found. The current implementation stops after
+100 restart attempts and prints an error message, "failed to factorize
+number".
+
+
+<p>
+A better (and faster) integer factoring algorithm needs to be implemented in Yacas.
+
+
+<p>
+
+<a name="factorization of integers!overview of algorithms">
+
+</a>
+Modern factoring algorithms are all probabilistic (i.e. they do not
+guarantee a particular finishing time) and fall into three categories:
+<ul><li>Methods that work well (i.e. quickly) if there is a relatively
+small factor </li>$p$ of $n$ (even if $n$ itself is large).
+Pollard's "rho"
+algorithm belongs to this category. The fastest in this category is
+Lenstra's elliptic curves method (ECM).
+<li>Methods that work equally quickly regardless of the size of factors
+(but slower with larger </li>$n$). These are the continued fractions method
+and the various "sieve" methods. The current best is the "General Number Field
+Sieve" (GNFS) but it is quite a complicated algorithm requiring
+operations with high-order algebraic numbers. The next best one is the
+"Multiple Polynomial Quadratic Sieve" (MPQS).
+<li>Methods that are suitable only for numbers of special
+"interesting" form, e.g. Fermat numbers </li>$2 ^{2 ^{k}} - 1$ or generally
+numbers of the form $r ^{s} + a$ where $s$ is large but $r$ and $a$ are very
+small integers. The best method seems to be the "Special Number
+Field Sieve" which is a faster variant of the GNFS adapted to the problem.
+</ul>
+
+<p>
+There is ample literature describing these algorithms.
+
+
+<p>
+
+<a name="c2s4">
+
+</a>
+<h2>
+<hr>2.4 The Jacobi symbol
+</h2>
+A number $m$ is a "quadratic residue modulo $n$" if there exists a number $k$ such that $k ^{2}\equiv m\bmod n$.
+
+
+<p>
+The Legendre symbol ($m$/$n$) is defined as $ + 1$ if $m$ is a quadratic residue modulo $n$ and $ - 1$ if it is a non-residue.
+The Legendre symbol is equal to $0$ if $\frac{m}{n} $ is an integer.
+
+
+<p>
+The Jacobi symbol $ \left( \frac{m}{n} \right) $ is defined as the product of the Legendre symbols of the prime factors $f _{i}$ of $n = f _{1} ^{p _{1}} \mathrm{ ... } f _{s} ^{p _{s}}$,
+$$ \left( \frac{m}{n} \right) \equiv  \left( \frac{m}{f _{1}} \right)  ^{p _{1}} \mathrm{ ... }  \left( \frac{m}{f _{s}} \right)  ^{p _{s}}.$$
+(Here we used the same notation $ \left( \frac{a}{b} \right) $ for the Legendre and the Jacobi symbols; this is confusing but seems to be the current practice.)
+The Jacobi symbol is equal to $0$ if $m$, $n$ are not mutually prime (have a common factor).
+The Jacobi symbol and the Legendre symbol have values $ + 1$, $ - 1$ or $0$.
+
+
+<p>
+The Jacobi symbol can be efficiently computed without knowing the full factorization of the number $n$.
+The currently used method is based on the following four identities for the Jacobi symbol:
+<ul><li></li>$ \left( \frac{a}{1} \right)  = 1$.
+<li></li>$ \left( \frac{2}{b} \right)  = \left(  - 1\right)  ^{\frac{b ^{2} - 1}{8} }$.
+<li></li>$ \left( \frac{a b}{c} \right)  =  \left( \frac{a}{c} \right)   \left( \frac{b}{c} \right) $.
+<li>If </li>$a\equiv b\bmod c$, then $ \left( \frac{a}{c} \right)  =  \left( \frac{b}{c} \right) $.
+<li>If </li>$a$, $b$ are both odd, then $ \left( \frac{a}{b} \right)  =  \left( \frac{b}{a} \right)  \left(  - 1\right)  ^{\left( a - 1\right)  \frac{b - 1}{4} }$.
+</ul>
+
+<p>
+Using these identities, we can recursively reduce the computation of the Jacobi symbol $ \left( \frac{a}{b} \right) $ to the computation of the Jacobi symbol for numbers that are on the average half as large.
+This is similar to the fast "binary" Euclidean algorithm for the computation of the GCD.
+The number of levels of recursion is logarithmic in the arguments $a$, $b$.
+
+
+<p>
+More formally, Jacobi symbol $ \left( \frac{a}{b} \right) $ is computed by the following algorithm.
+(The number $b$ must be an odd positive integer, otherwise the result is undefined.)
+<ul><li>If </li>$b = 1$, return $1$ and stop. If $a = 0$, return $0$ and stop. Otherwise, replace $ \left( \frac{a}{b} \right) $ by $ \left( \frac{a\bmod b}{b} \right) $ (identity 4).
+<li>Find the largest power of </li>$2$ that divides $a$. Say, $a = 2 ^{s} c$ where $c$ is odd.
+Replace $ \left( \frac{a}{b} \right) $ by $ \left( \frac{c}{b} \right)  \left(  - 1\right)  ^{s \frac{b ^{2} - 1}{8} }$ (identities 2 and 3).
+<li>Now that </li>$c &lt; b$, replace $ \left( \frac{c}{b} \right) $ by $ \left( \frac{b}{c} \right)  \left(  - 1\right)  ^{\left( b - 1\right)  \frac{c - 1}{4} }$ (identity 5).
+<li>Continue to step 1.
+</li></ul>
+
+<p>
+Note that the arguments $a$, $b$ may be very large integers and we should avoid performing multiplications of these numbers.
+We can compute $\left(  - 1\right)  ^{\left( b - 1\right)  \frac{c - 1}{4} }$ without multiplications. This expression is equal to $1$ if either $b$ or $c$ is equal to 1 mod 4; it is equal to $ - 1$ only if both $b$ and $c$ are equal to 3 mod 4.
+Also, $\left(  - 1\right)  ^{\frac{b ^{2} - 1}{8} }$ is equal to $1$ if either $b\equiv 1$ or $b\equiv 7$ mod 8, and it is equal to $ - 1$ if $b\equiv 3$ or $b\equiv 5$ mod 8.
+Of course, if $s$ is even, none of this needs to be computed.
+
+
+<p>
+
+<a name="c2s5">
+
+</a>
+<h2>
+<hr>2.5 Integer partitions
+</h2>
+<a name="partitions of an integer">
+
+</a>
+A partition of an integer $n$ is a way of writing $n$ as the sum of positive integers, where the order of these integers is unimportant.
+For example, there are 3 ways to write the number 3 in this way: $3 = 1 + 1 + 1$, $3 = 1 + 2$, $3 = 3$.
+The function <b><tt>PartitionsP</tt></b> counts the number of such partitions. 
+
+
+<p>
+
+<a name="partitions of an integer!by Rademacher-Hardy-Ramanujan series">
+
+</a>
+<h3>
+<hr>Large $n$
+</h3>
+The first algorithm used to compute this function uses the Rademacher-Hardy-Ramanujan (RHR) theorem and is efficient for large $n$.
+(See for example [Ahlgren <i>et al.</i> 2001].)
+The number of partitions $P\left( n\right) $ is equal to an infinite sum:
+
+
+<p>
+$$P\left( n\right)  = \frac{1}{\pi  \sqrt{2}}  \sum _{k = 1} ^{\infty } \sqrt{k} A\left( k, n\right)  S\left( k, n\right) ,$$
+where the functions $A$ and $S$ are defined as follows:
+
+
+<p>
+$$S\left( k, n\right) \equiv \frac{\partial}{\partial n}\frac{\sinh \frac{\pi }{k}  \sqrt{\frac{2}{3}  \left( n - \frac{1}{24} \right) }}{\sqrt{n - \frac{1}{24} }} $$
+
+
+<p>
+$$A\left( k, n\right) \equiv \sum _{l = 1} ^{k} \delta \left( \mathrm{ Gcd }\left( l, k\right) , 1\right)  \exp \left(  - 2 \pi  \imath  \frac{l n}{k}  + \pi  \imath  B\left( k, l\right) \right) ,$$
+where $\delta \left( x, y\right) $ is the Kronecker delta function (so that the summation goes only over integers $l$ which are mutually prime with $k$) and $B$ is defined by
+$$B\left( k, l\right) \equiv \sum _{j = 1} ^{k - 1} \frac{j}{k}  \left( l \frac{j}{k}  - \left\lfloor l \frac{j}{k} \right\rfloor  - \frac{1}{2} \right) .$$
+
+
+<p>
+The first term of the series gives, at large $n$, the Hardy-Ramanujan asymptotic estimate,
+$$P\left( n\right) \sim P_0\left( n\right) \equiv \frac{1}{4 n \sqrt{3}}  \exp \left( \pi  \sqrt{\frac{2 n}{3} }\right) .$$
+The absolute value of each term decays quickly,
+so after $O\left( \sqrt{n}\right) $ terms the series gives an answer that is very close to the integer result.
+
+
+<p>
+There exist estimates of the error of this series, but they are complicated.
+The series is sufficiently well-behaved and it is easier to determine the truncation point heuristically.
+Each term of the series is either 0 (when all terms in $A\left( k, n\right) $ happen to cancel) or has a magnitude which is not very much larger than the magnitude of the previous nonzero term.
+(But the series is not actually monotonic.)
+In the current implementation, the series is truncated when $\left| A\left( k, n\right)  S\left( n\right)  \sqrt{k}\right| $ becomes smaller than $0.1$ for the first time;
+in any case, the maximum number of calculated terms is $5 + \frac{\sqrt{n}}{2} $.
+One can show that asymptotically for large $n$, the required number of terms is less than $\frac{\mu }{\ln \mu } $, where $\mu \equiv \pi  \sqrt{\frac{2 n}{3} }$.
+
+
+<p>
+[Ahlgren <i>et al.</i> 2001] mention that there exist explicit constants $B _{1}$ and $B _{2}$ such that
+$$\left| P\left( n\right)  - \sum _{k = 1} ^{B _{1} \sqrt{n}} A\left( k, n\right) \right|  &lt; B _{2} n ^{ - \frac{1}{4} }.$$
+
+
+<p>
+The floating-point precision necessary to obtain the integer result must be at least the number of digits in the first term $P_0\left( n\right) $, i.e.
+$$\mathrm{ Prec } &gt; \frac{\pi  \sqrt{\frac{2}{3}  n} - \ln 4 n \sqrt{3}}{\ln 10} .$$
+However, Yacas currently uses the fixed-point precision model.
+Therefore, the current implementation divides the series by $P_0\left( n\right) $ and computes all terms to $\mathrm{ Prec }$ digits.
+
+
+<p>
+The RHR algorithm requires $O\left( \left( \frac{n}{\ln n} \right)  ^{\frac{3}{2} }\right) $ operations, of which $O\left( \frac{n}{\ln n} \right) $ are long multiplications at precision $\mathrm{ Prec }\sim O\left( \sqrt{n}\right) $ digits.
+The computational cost is therefore $O\left( \frac{n}{\ln n}  M\left( \sqrt{n}\right) \right) $.
+
+
+<p>
+
+<a name="partitions of an integer!by recurrence relation">
+
+</a>
+<h3>
+<hr>Small $n$
+</h3>
+The second, simpler algorithm involves a recurrence relation
+$$P _{n} = \sum _{k = 1} ^{n} \left(  - 1\right)  ^{k + 1} \left( P _{n - k \frac{3 k - 1}{2} } + P _{n - k \frac{3 k + 1}{2} }\right) .$$
+The sum can be written out as
+$$P\left( n - 1\right)  + P\left( n - 2\right)  - P\left( n - 5\right)  - P\left( n - 7\right)  + \mathrm{ ... },$$
+where 1, 2, 5, 7, ... is the "generalized pentagonal sequence" generated by the pairs $k \frac{3 k - 1}{2} $, $k \frac{3 k + 1}{2} $ for $k = 1$, 2, ...
+The recurrence starts from $P\left( 0\right)  = 1$, $P\left( 1\right)  = 1$.
+(This is implemented as <b><tt>PartitionsP'recur</tt></b>.)
+
+
+<p>
+The sum is actually not over all $k$ up to $n$ but is truncated when the pentagonal sequence grows above $n$.
+Therefore, it contains only $O\left( \sqrt{n}\right) $ terms.
+However, computing $P\left( n\right) $ using the recurrence relation requires computing and storing $P\left( k\right) $ for all $1\leq k\leq n$.
+No long multiplications are necessary, but the number of long additions of numbers with $\mathrm{ Prec }\sim O\left( \sqrt{n}\right) $ digits is $O\left( n ^{\frac{3}{2} }\right) $.
+Therefore the computational cost is $O\left( n ^{2}\right) $.
+This is asymptotically slower than the RHR algorithm even if a slow $O\left( n ^{2}\right) $ multiplication is used.
+With internal Yacas math, the recurrence relation is faster for $n &lt; 300$ or so,
+and for larger $n$ the RHR algorithm is faster.
+
+
+<p>
+
+<a name="c2s6">
+
+</a>
+<h2>
+<hr>2.6 Miscellaneous functions
+</h2>
+<a name="divisors">
+
+</a>
+The function <b><tt>Divisors</tt></b> currently returns the number of divisors of integer, while <b><tt>DivisorsSum</tt></b> returns the sum of these divisors.
+(The current
+algorithms need to factor the number.) The following theorem is used:
+
+
+<p>
+Let $p _{1} ^{k _{1}} \mathrm{ ... } p _{r} ^{k _{r}}$ be the prime factorization of $n$, where $r$ is the
+number of prime factors and $k _{r}$ is the multiplicity of the $r$-th factor. Then
+$$\mathrm{ Divisors }\left( n\right)  = \left( k _{1} + 1\right)  \mathrm{ ... } \left( k _{r} + 1\right) ,$$
+$$\mathrm{ DivisorsSum }\left( n\right)  = \frac{p _{1} ^{k _{1} + 1} - 1}{p _{1} - 1}  \mathrm{ ... } \frac{p _{r} ^{k _{r} + 1} - 1}{p _{r} - 1} .$$
+
+
+<p>
+
+<a name="divisors!proper">
+
+</a>
+The functions <b><tt>ProperDivisors</tt></b> and <b><tt>ProperDivisorsSum</tt></b> are functions that do the same as the above functions,
+except they do not consider the number $n$ as a divisor for itself.
+These functions are defined by:
+
+
+<p>
+$\mathrm{ ProperDivisors }\left( n\right)  = \mathrm{ Divisors }\left( n\right)  - 1$,
+
+
+<p>
+$\mathrm{ ProperDivisorsSum }\left( n\right)  = \mathrm{ DivisorsSum }\left( n\right)  - n$.
+
+
+<p>
+Another number-theoretic function is <b><tt>Moebius</tt></b>, defined as
+follows:
+$\mathrm{ Moebius }\left( n\right)  = \left(  - 1\right)  ^{r}$ if no factors of $n$ are repeated, $\mathrm{ Moebius }\left( n\right)  = 0$ if
+some factors are repeated, and $\mathrm{ Moebius }\left( n\right)  = 1$ if $n = 1$.
+This again requires to factor the number $n$ completely and investigate the
+properties of its prime factors. From
+the definition, it can be seen that if $n$ is prime, then $\mathrm{ Moebius }\left( n\right)  =  - 1$. The predicate
+<b><tt>IsSquareFree(n)</tt></b> then reduces to $\mathrm{ Moebius }\left( n\right) \neq 0$, which means that no factors of $n$ are repeated.
+
+
+<p>
+
+<a name="c2s7">
+
+</a>
+<h2>
+<hr>2.7 Gaussian integers
+</h2>
+<a name="Gaussian integers">
+
+</a>
+A "Gaussian integer" is a complex number of the form $z = a + b \imath $, where $a$ and 
+$b$ are ordinary (rational) integers.
+<h6>To distinguish ordinary integers from Gaussian integers, the ordinary integers (with no imaginary part) are called "rational integers".</h6>The ring of Gaussian integers is usually
+denoted by $Z$[$\imath $] in the mathematical literature. It is an example of a ring of
+algebraic integers.
+
+
+<p>
+The function <b><tt>GaussianNorm</tt></b> computes the norm $N\left( z\right)  = a ^{2} + b ^{2}$ of $z$.
+The norm
+plays a fundamental role in the arithmetic of Gaussian integers, since it has
+the multiplicative property:
+$$N\left( z.w\right)  = N\left( z\right) .N\left( w\right) .$$
+
+
+<p>
+A unit of a ring is an element that divides any other element of the ring.
+There are four units in the Gaussian integers: $1$, $ - 1$, $\imath $, $ - \imath $. They are 
+exactly the Gaussian integers whose norm is $1$. The predicate <b><tt>IsGaussianUnit</tt></b> 
+tests for a Gaussian unit.
+
+
+<p>
+Two Gaussian integers $z$ and $w$ are "associated" is $\frac{z}{w} $ is a unit. 
+For example, $2 + \imath $ and $ - 1 + 2 \imath $ are associated. 
+
+
+<p>
+A Gaussian integer is called prime if it is only divisible by the units and by
+its associates. It can be shown that the primes in the ring of Gaussian 
+integers are:
+<ul><li></li>$1 + i$ and its associates.
+<li>The rational (ordinary) primes of the form </li>$4 n + 3$.
+<li>The factors </li>$a + b \imath $ of rational primes $p$ of the form $p = 4 n + 1$, whose norm is $p = a ^{2} + b ^{2}$. 
+</ul>
+
+<p>
+For example, $7$ is prime as a Gaussian integer, while $5$ is not, since
+$5 = \left( 2 + \imath \right)  \left( 2 - \imath \right) $.
+Here $2 + \imath $ is a Gaussian prime.
+
+
+<p>
+
+<a name="Factors@\relax <b><tt>Factors</tt></b>">
+
+</a>
+The ring of Gaussian integers is an example of an Euclidean ring, i.e. a ring 
+where there is a division algorithm.
+This makes it possible to compute the greatest common divisor using Euclid's algorithm. This is what the function <b><tt>GaussianGcd</tt></b> computes. 
+
+
+<p>
+As a consequence, one can prove a version of the fundamental 
+theorem of arithmetic for this ring: The expression of a Gaussian 
+integer as a product of primes is unique, apart from the order of primes, the
+presence of units, and the ambiguities between associated primes.
+
+
+<p>
+The function <b><tt>GaussianFactors</tt></b> finds this expression of a Gaussian integer 
+$z$ as the product of Gaussian primes, and returns the result
+as a list of pairs <b><tt>{p,e}</tt></b>, where $p$ is a Gaussian prime and $e$ is the corresponding exponent.
+To do that, an auxiliary function called <b><tt>GaussianFactorPrime</tt></b> is used. This 
+function finds a factor of a rational prime of the form $4 n + 1$. We 
+compute  $a\equiv \left( 2 n\right) !$ (mod p). By Wilson's theorem $a ^{2}$ is congruent to
+$ - 1$ (mod $p$), and it follows that $p$ divides $\left( a + \imath \right)  \left( a - \imath \right)  = a ^{2} + 1$ in the 
+Gaussian  integers. The desired factor is then the <b><tt>GaussianGcd</tt></b> of $a + \imath $ 
+and $p$. If the result is $a + b \imath $, then $p = a ^{2} + b ^{2}$. 
+
+
+<p>
+If $z$ is a rational (i.e. real) integer, we factor $z$ in the Gaussian integers by first 
+factoring it in the rational integers, and after that by factoring each of 
+the integer prime factors in the Gaussian integers.
+
+
+<p>
+If $z$ is not a rational integer, we find its possible Gaussian prime factors
+by first factoring its norm $N\left( z\right) $ and then computing the exponent of each of 
+the factors of $N\left( z\right) $ in the decomposition of $z$.
+
+
+<p>
+
+<h3>
+<hr>References for Gaussian integers
+</h3>
+<ul><li>G. H. Hardy and E. M. Wright,
+</li><i>An Introduction to the Theory of Numbers</i>. Oxford University Press (1945).
+<li>H. Pollard,
+</li><i>The theory of Algebraic Numbers</i>. Wiley, New York (1965).
+</ul>
+
+<p>
+
+
+<script src="http://www.google-analytics.com/urchin.js" type="text/javascript">
+</script>
+<script type="text/javascript">
+_uacct = "UA-2425144-1";
+urchinTracker();
+</script>
+</body>
+
+</html>

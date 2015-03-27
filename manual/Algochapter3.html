@@ -1,0 +1,1127 @@
+<html>
+<head>
+  <title>A simple factorization algorithm for univariate polynomials</title>
+  <link rel="stylesheet" href="yacas.css" TYPE="text/css" MEDIA="screen">
+  <script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
+    });
+  </script>
+  <script type="text/javascript"
+    src="https://c328740.ssl.cf1.rackcdn.com/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+</head>
+<body>
+<a name="c3">
+
+</a>
+<h1>
+3. A simple factorization algorithm for univariate polynomials
+</h1>
+<p> </p>
+This section discusses factoring polynomials using
+arithmetic modulo prime numbers. Information was
+used from D. Knuth, <i>The Art of Computer Programming, Volume 2, Seminumerical Algorithms </i>
+and J.H. Davenport et. al., <i>Computer Algebra, SYSTEMS AND ALGORITHMS FOR ALGEBRAIC COMPUTATION</i>.
+
+
+<p>
+A simple factorization algorithm is developed
+for univariate polynomials. This algorithm is implemented
+as the function <b><tt>BinaryFactors</tt></b>. The algorithm was named
+the binary factoring algorithm since it determines 
+factors to a polynomial modulo $2 ^{n}$ for successive 
+values of $n$, effectively adding one binary digit to
+the solution in each iteration. No reference to this
+algorithm has been found so far in literature.
+
+
+<p>
+Berlekamp showed that polynomials can be efficiently factored
+when arithmetic is done modulo a prime. The Berlekamp
+algorithm is only efficient for small primes, but after that
+Hensel lifting can be used to determine the factors modulo
+larger numbers.
+
+
+<p>
+The algorithm presented here is similar in approach to applying
+the Berlekamp algorithm to factor modulo a small prime, and then
+factoring modulo powers of this prime (using the solutions found modulo
+the small prime by the Berlekamp algorithm) by applying Hensel lifting.
+However it is simpler in set up. It factors modulo 2, by trying
+all possible factors modulo 2 (two possibilities, if the polynomial
+is monic). This performs the same action usually left to the 
+Berlekamp step. After that, given a solution modulo $2 ^{n}$, it will
+test for a solution $f_i$ modulo $2 ^{n}$ if $f_i$ or $f_i + 2 ^{n}$ 
+are a solution modulo $2 ^{n + 1}$.
+
+
+<p>
+This scheme raises the precision of the solution with one 
+digit in binary representation. This is similar to the linear
+Hensel lifting algorithm, which factors modulo $p ^{n}$ for some prime $p$, where
+$n$ increases by one after each iteration. There is also a 
+quadratic version of Hensel lifting which factors modulo $p ^{2 ^{n}}$,
+in effect doubling the number of digits (in p-adic expansion) of the solution after
+each iteration. However, according to "Davenport", the quadratic
+algorithm is not necessarily faster.
+
+
+<p>
+The algorithm here thus should be equivalent in complexity
+to Hensel lifting linear version. This has not been verified yet.
+
+
+<p>
+
+<a name="c3s1">
+
+</a>
+<h2>
+<hr>3.1 Modular arithmetic
+</h2>
+This section copies some definitions and rules from
+<i>The Art of Computer Programming, Volume 1, Fundamental Algorithms </i>
+regarding arithmetic modulo an integer.
+
+
+<p>
+Arithmetic modulo an integer $p$  requires performing the
+arithmetic operation and afterwards determining that
+integer modulo $p$. A number $x$ can be written as 
+$$x = q p + r$$
+where $q$ is called the quotient, and $r$ remainder.
+There is some liberty in the range one chooses $r$
+to be in. If $r$ is an integer in the range $<b><tt>0,1, ... ,(p-1)</tt></b>$
+then it is the <i>modulo</i>, $r = x\bmod p$.
+
+
+<p>
+When $x\bmod p = y\bmod p$, the notation $\left( x = y\right) \bmod p$
+is used. All arithmetic calculations are done modulo
+an integer $p$ in that case.
+
+
+<p>
+For calculations modulo some $p$ the following rules
+hold:
+
+
+<p>
+<ul><li>If </li>$\left( a = b\right) \bmod p$ and $\left( x = y\right) \bmod p$, then
+$\left( a x = b y\right) \bmod p$, $\left( a + x = b + y\right) \bmod p$, and $\left( a - x = b - y\right) \bmod p$.
+This means that for instance also $x ^{n}\bmod p = \left( x\bmod p\right)  ^{n}\bmod p$
+</ul>
+
+<p>
+<ul><li>Two numbers </li>$x$ and $y$ are <i>relatively prime</i> if they don't 
+share a common factor, that is, if their greatest common denominator 
+is one, $\mathrm{ Gcd }\left( x, y\right)  = 1$.
+</ul>
+
+<p>
+<ul><li>If </li>$\left( a x = b y\right) \bmod p$ and if $\left( a = b\right) \bmod p$, and if $a$ and
+$p$ are relatively prime, then $\left( x = y\right) \bmod p$.
+This is useful for dividing out common factors.
+</ul>
+
+<p>
+<ul><li></li>$\left( a = b\right) \bmod p$ if and only if $\left( a n = b n\right) \bmod \left( n p\right) $ when $n\neq 0$.
+Also, if $r$ and $s$ are relatively prime, then $\left( a = b\right) \bmod \left( r s\right) $ only if
+$\left( a = b\right) \bmod r$ and $\left( a = b\right) \bmod s$.
+These rules are useful when the modulus is changed.
+</ul>
+
+<p>
+For polynomials $v_1\left( x\right) $ and $v_2\left( x\right) $ it further holds
+that 
+$$\left( \left( v_1\left( x\right)  + v_2\left( x\right) \right)  ^{p} = v_1\left( x\right)  ^{p} + v_2\left( x\right)  ^{p}\right) \bmod p$$
+This follows by writing out the expression, noting that
+the binomial coefficients that result are multiples of $p$,
+and thus their value modulo $p$ is zero ($p$ divides these
+coefficients), so only the two terms on the right hand side 
+remain.
+
+
+<p>
+
+<h3>
+<hr>Some corollaries
+</h3>
+One corollary of the rules for calculations modulo an integer
+is <i>Fermat's theorem, 1640</i> : if $p$ is a prime number
+then 
+$$\left( a ^{p} = a\right) \bmod p$$
+for all integers $a$ (for a proof, see Knuth).
+
+
+<p>
+An interesting corollary to this is that, for some 
+prime integer $p$:
+$$\left( v\left( x\right)  ^{p} = v\left( x ^{p}\right) \right) \bmod p.$$
+This follows from writing it out and using Fermat's theorem
+to replace $a ^{p}$ with $a$ where appropriate (the coefficients
+to the polynomial when written out, on the left hand side).
+
+
+<p>
+
+<a name="c3s2">
+
+</a>
+<h2>
+<hr>3.2 Factoring using modular arithmetic
+</h2>
+The task is to factor a polynomial 
+
+
+<p>
+$$p\left( x\right)  = a_n x ^{n} + \mathrm{ ... } + a_0$$
+
+
+<p>
+into a form 
+
+
+<p>
+$$p\left( x\right)  = C g\left( x\right)  f_1\left( x\right)  ^{p_1} f_2\left( x\right)  ^{p_2} \mathrm{ ... } f_m\left( x\right)  ^{p_m}$$
+
+
+<p>
+Where $f_i\left( x\right) $ are irreducible polynomials of the form:
+
+
+<p>
+$$f_i\left( x\right)  = x + c_i$$
+
+
+<p>
+The part that could not be factorized is returned as $g\left( x\right) $,
+with a possible constant factor $C$.
+
+
+<p>
+The factors $f_i\left( x\right) $ and $g\left( x\right) $ are determined uniquely by requiring
+them to be monic. The constant $C$ accounts for a common factor.
+
+
+<p>
+The $c_i$ constants in the resulting solutions $f_i\left( x\right) $ can be 
+rational numbers (or even complex numbers, if Gaussian integers
+are used).
+
+
+<p>
+
+<a name="c3s3">
+
+</a>
+<h2>
+<hr>3.3 Preparing the polynomial for factorization
+</h2>
+The final factoring algorithm needs the input polynomial to
+be monic with integer coefficients (a polynomial is monic if
+its leading coefficient is one). Given a non-monic 
+polynomial with rational coefficients, the following steps
+are performed:
+
+
+<p>
+
+<h3>
+<hr>Convert polynomial with rational coefficients to polynomial with integer coefficients
+</h3>
+First the least common multiple $\mathrm{ lcm }$ of the denominators of the
+coefficients $p\left( x\right) $ has to be found, and the polynomial is multiplied by this number. 
+Afterwards, the $C$ constant in the result should have a factor
+$\frac{1}{\mathrm{ lcm }} $.
+
+
+<p>
+The polynomial now only has integer coefficients.
+
+
+<p>
+
+<h3>
+<hr>Convert polynomial to a monic polynomial
+</h3>
+The next step is to convert the polynomial to one where the leading
+coefficient is one. In order to do so, following "Davenport",
+the following steps have to be taken:
+
+
+<p>
+<ul><li>Multiply the polynomial by </li>$a_n ^{n - 1}$
+<li>Perform the substitution </li>$x = \frac{y}{a_n} $
+</ul>
+
+<p>
+The polynomial is now a monic polynomial in $y$.
+
+
+<p>
+After factoring, the irreducible factors of $p\left( x\right) $
+can be obtained by multiplying $C$ with $\frac{1}{a_n ^{n - 1}} $,
+and replacing $y$ with $a_n x$. The irreducible 
+solutions $a_n x + c_i$ can be replaced by $x + \frac{c_i}{a_i} $
+after multiplying $C$ by $a_n$, converting the factors
+to monic factors.
+
+
+<p>
+After the steps described here the polynomial is now monic with integer coefficients,
+and the factorization of this polynomial can be used to 
+determine the factors of the original polynomial $p\left( x\right) $.
+
+
+<p>
+
+<a name="c3s4">
+
+</a>
+<h2>
+<hr>3.4 Definition of division of polynomials
+</h2>
+To factor a polynomial a division operation for polynomials
+modulo some integer is needed. This algorithm needs to return
+a quotient $q\left( x\right) $ and remainder $r\left( x\right) $ such that:
+
+
+<p>
+$$\left( p\left( x\right)  = q\left( r\right)  d\left( x\right)  + r\left( x\right) \right) \bmod p$$
+
+
+<p>
+for some polymomial $d\left( x\right) $ to be divided by, modulo 
+some integer p. $d\left( x\right) $ is
+said to divide $p\left( x\right) $ (modulo $p$) if $r\left( x\right) $ is zero.
+It is then a factor modulo $p$.
+
+
+<p>
+For binary factoring algorithm it is important
+that if some monic $d\left( x\right) $ divides $p\left( x\right) $, then it also
+divides $p\left( x\right) $ modulo some integer $p$.
+
+
+<p>
+Define $\mathrm{ deg }\left( f\left( x\right) \right) $ to be the degree of $f\left( x\right) $ and $lc\left( f\left( x\right) \right) $
+to be the leading coefficient of $f\left( x\right) $. Then, if 
+$\mathrm{ deg }\left( p\left( x\right) \right) \geq \mathrm{ deg }\left( d\left( x\right) \right) $, one can compute an integer $s$
+such that
+
+
+<p>
+$$\left( lc\left( d\left( x\right) \right)  s = lc\left( p\left( x\right) \right) \right) \bmod p$$
+
+
+<p>
+If $p$ is prime, then 
+
+
+<p>
+$$s = \left( lc\left( p\left( x\right) \right)  lc\left( d\left( x\right) \right)  ^{p - 2}\right) \bmod p$$
+
+
+<p>
+Because $\left( a ^{p - 1} = 1\right) \bmod p$ for any $a$. If $p$ is not prime
+but $d\left( x\right) $ is monic (and thus $lc\left( d\left( x\right) \right)  = 1$),
+
+
+<p>
+$$s = lc\left( p\left( x\right) \right) $$
+
+
+<p>
+This identity can also be used when dividing in 
+general (not modulo some integer), since the 
+divisor is monic.
+
+
+<p>
+The quotient can then be updated by adding 
+a term:
+
+
+<p>
+$\mathrm{ term } = s x ^{\mathrm{ deg }\left( p\left( x\right) \right)  - \mathrm{ deg }\left( d\left( x\right) \right) }$
+
+
+<p>
+and updating the polynomial to be divided, $p\left( x\right) $,
+by subtracting $d\left( x\right)  \mathrm{ term }$. The resulting polynomial
+to be divided now has a degree one smaller than the
+previous.
+
+
+<p>
+When the degree of $p\left( x\right) $ is less than the degree
+of $d\left( x\right) $ it is returned as the remainder.
+
+
+<p>
+A full division algorithm for arbitrary integer $p &gt; 1$
+with $lc\left( d\left( x\right) \right)  = 1$ would thus look like:
+
+
+<p>
+<table cellpadding="0" width="100%">
+<tr><td width=100% bgcolor="#DDDDEE"><pre>
+divide(p(x),d(x),p)
+   q(x) = 0
+   r(x) = p(x)
+   while (deg(r(x)) &gt;= deg(d(x)))
+      s = lc(r(x))
+      term = s*x^(deg(r(x))-deg(d(x)))
+      q(x) = q(x) + term
+      r(x) = r(x) - term*d(x) mod p
+   return {q(x),r(x)}
+</pre></tr>
+</table>
+
+
+<p>
+The reason we can get away with factoring modulo $2 ^{n}$
+as opposed to factoring modulo some prime $p$ in later
+sections is that the divisor $d\left( x\right) $ is monic. Its leading 
+coefficient is one and thus $q\left( x\right) $ and $r\left( x\right) $ can be 
+uniquely determined. If $p$ is not prime and $lc\left( d\left( x\right) \right) $
+is not equal to one, there might be multiple combinations
+for which $p\left( x\right)  = q\left( x\right)  d\left( x\right)  + r\left( x\right) $, and we are interested
+in the combinations where $r\left( x\right) $ is zero. This can be
+costly to determine unless <b><tt>q(x),r(x)</tt></b> is unique.
+This is the case here because we are factoring
+a monic polynomial, and are thus only interested in cases
+where $lc\left( d\left( x\right) \right)  = 1$.
+
+
+<p>
+
+<a name="c3s5">
+
+</a>
+<h2>
+<hr>3.5 Determining possible factors modulo 2
+</h2>
+We start with a polynomial $p\left( x\right) $ which is monic and
+has integer coefficients.
+
+
+<p>
+It will be factored into a form:
+
+
+<p>
+$$p\left( x\right)  = g\left( x\right)  f_1\left( x\right)  ^{p_1} f_2\left( x\right)  ^{p_2} \mathrm{ ... } f_m\left( x\right)  ^{p_m}$$
+
+
+<p>
+where all factors $f_i\left( x\right) $ are monic also.
+
+
+<p>
+The algorithm starts by setting up a test polynomial,
+$p_\mathrm{ test }\left( x\right) $ which divides $p\left( x\right) $, but has the property
+that
+
+
+<p>
+$$p_\mathrm{ test }\left( x\right)  = g\left( x\right)  f_1\left( x\right)  f_2\left( x\right)  \mathrm{ ... } f_m\left( x\right) $$
+
+
+<p>
+Such a polynomial is said to be <i>square-free</i>. 
+It has the same factors as the original polynomial, but
+the original might have multiple of each factor, 
+where $p_\mathrm{ test }\left( x\right) $ does not.
+
+
+<p>
+The square-free part of a polynomial can be obtained
+as follows:
+
+
+<p>
+$$p_\mathrm{ test }\left( x\right)  = \frac{p\left( x\right) }{\mathrm{ Gcd }\left( p\left( x\right) , \frac{d}{d x}p\left( x\right) \right) } $$
+
+
+<p>
+It can be seen by simply writing this out that 
+$p\left( x\right) $ and $\frac{d}{d x}p\left( x\right) $ will have factors $f_i\left( x\right)  ^{p_i - 1}$ in 
+common. these can thus be divided out.
+
+
+<p>
+It is not a requirement of the algorithm that the
+algorithm being worked with is square-free, but it
+speeds up computations to work with the square-free
+part of the polynomial if the only thing sought after
+is the set of factors. The multiplicity of the factors
+can be determined using the original $p\left( x\right) $.
+
+
+<p>
+Binary factoring then proceeds by trying to find potential solutions
+modulo $p = 2$ first. There can only be two such
+solutions: $x + 0$ and $x + 1$. 
+
+
+<p>
+A list of possible solutions $L$ is set up with potential solutions.
+
+
+<p>
+
+<a name="c3s6">
+
+</a>
+<h2>
+<hr>3.6 Determining factors modulo $2 ^{n}$ given a factorization modulo 2
+</h2>
+At this point there is a list $L$ with solutions modulo
+$2 ^{n}$ for some $n$. The solutions will be of the form:
+$x + a$. The first step is to determine if any of the
+elements in $L$ divides $p\left( x\right) $ (not modulo any integer).
+Since $x + a$ divides $p_\mathrm{ test }\left( x\right) $ modulo $2 ^{n}$, 
+both $x + a$ and $x + a - 2 ^{n}$ have to be checked.
+
+
+<p>
+If an element in $L$ divides $p_\mathrm{ test }\left( x\right) $, $p_\mathrm{ test }\left( x\right) $
+is divided by it, and a loop is entered to test how often
+it divides $p\left( x\right) $ to determine the multiplicity $p_i$ of the
+factor. The found factor $f_i\left( x\right)  = x + c_i$ is added 
+as a combination ($x + c_i$, $p_i$). $p\left( x\right) $ is divided by $f_i\left( x\right)  ^{p_i}$.
+
+
+<p>
+At this point there is a list $L$ of factors that divide
+$p_\mathrm{ test }\left( x\right) $ modulo $2 ^{n}$. This implies that for each
+of the elements $u$ in $L$, either $u$ or $u + 2 ^{n}$ should
+divide $p_\mathrm{ test }\left( x\right) $ modulo $2 ^{n + 1}$.
+The following step is thus to set up a new list with new
+elements that divide $p_\mathrm{ test }\left( x\right) $ modulo $2 ^{n + 1}$.
+
+
+<p>
+The loop is re-entered, this time doing the calculation
+modulo $2 ^{n + 1}$ instead of modulo $2 ^{n}$.
+
+
+<p>
+The loop is terminated if the number of factors found
+equals $\mathrm{ deg }\left( p_\mathrm{ test }\left( x\right) \right) $, or if $2 ^{n}$ is larger than
+the smallest non-zero coefficient of $p_\mathrm{ test }\left( x\right) $ as this 
+smallest non-zero coefficient is the product of all the 
+smallest non-zero coefficients of the factors, or if 
+the list of potential factors is zero.
+
+
+<p>
+The polynomial $p\left( x\right) $ can not be factored any further,
+and is added as a factor ($p\left( x\right) $, $1$).
+
+
+<p>
+The function <b><tt>BinaryFactors</tt></b>, when implemented, yields
+the following interaction in Yacas:
+
+
+<p>
+<table cellpadding="0" width="100%">
+<tr><td width=100% bgcolor="#DDDDEE"><pre>
+In&gt; BinaryFactors((x+1)^4*(x-3)^2)
+Out&gt; {{x-3,2},{x+1,4}}
+In&gt; BinaryFactors((x-1/5)*(2*x+1/3))
+Out&gt; {{2,1},{x-1/5,1},{x+1/6,1}}
+In&gt; BinaryFactors((x-1123125)*(2*x+123233))
+Out&gt; {{2,1},{x-1123125,1},{x+123233/2,1}}
+</pre></tr>
+</table>
+
+
+<p>
+The binary factoring algorithm starts with a factorization modulo 2,
+and then each time tries to guess the next bit of the 
+solution, maintaining a list of potential solutions.
+This list can grow exponentially in certain instances.
+For instance, factoring $\left( x - a\right)  \left( x - 2 a\right)  \left( x - 3 a\right)  \mathrm{ ... }$
+implies a that the roots have common factors. There
+are inputs where the number
+of potential solutions (almost) doubles with each iteration. 
+For these inputs the algorithm becomes exponential. The worst-case
+performance is therefore exponential. The list of potential
+solutions while iterating will contain a lot of false roots
+in that case.
+
+
+<p>
+
+<a name="c3s7">
+
+</a>
+<h2>
+<hr>3.7 Efficiently deciding if a polynomial divides another
+</h2>
+Given the polynomial $p\left( x\right) $, and a potential divisor 
+$$f_i\left( x\right)  = x - p$$ modulo some $q = 2 ^{n}$ an expression for
+the remainder after division is
+
+
+<p>
+$$\mathrm{ rem }\left( p\right)  = \sum _{i = 0} ^{n} a_i p ^{i}$$
+
+
+<p>
+For the initial solutions modulo 2, where the possible 
+solutions are $x$ and $x - 1$. For $p = 0$, $\mathrm{ rem }\left( 0\right)  = a_0$.
+For $p = 1$, $\mathrm{ rem }\left( 1\right)  = \sum _{i = 0} ^{n} a_i$ .
+
+
+<p>
+Given a solution $x - p$ modulo $q = 2 ^{n}$, we consider
+the possible solutions $\left( x - p\right) \bmod 2 ^{n + 1}$ and 
+$\left( x - \left( p + 2 ^{n}\right) \right) \bmod \left( 2 ^{n} + 1\right) $.
+
+
+<p>
+$x - p$ is a possible solution if $\mathrm{ rem }\left( p\right) \bmod 2 ^{n + 1} = 0$.
+
+
+<p>
+$x - \left( p + q\right) $ is a possible solution if $\mathrm{ rem }\left( p + q\right) \bmod 2 ^{n + 1} = 0$.
+Expanding $\mathrm{ rem }\left( p + q\right) \bmod \left( 2 q\right) $ yields:
+
+
+<p>
+$$\mathrm{ rem }\left( p + q\right) \bmod \left( 2 q\right)  = \left( \mathrm{ rem }\left( p\right)  + \mathrm{ extra }\left( p, q\right) \right) \bmod \left( 2 q\right) $$
+
+
+<p>
+When expanding this expression, some terms
+grouped under $\mathrm{ extra }\left( p, q\right) $ have factors like $2 q$ 
+or $q ^{2}$. Since $q = 2 ^{n}$, these terms vanish if the
+calculation is done modulo $2 ^{n + 1}$.
+
+
+<p>
+The expression for $\mathrm{ extra }\left( p, q\right) $ then becomes 
+$$\mathrm{ extra }\left( p, q\right)  = q \sum _{i = 1} ^{\frac{n}{2} } \left( 2 i - 1\right)  a\left( 2 i\right)  p ^{2 i - 2}$$
+
+
+<p>
+An efficient approach to determining if $x - p$ or $x - \left( p + q\right) $
+divides $p\left( x\right) $ modulo $2 ^{n + 1}$ is then to first calculate
+$\mathrm{ rem }\left( p\right) \bmod \left( 2 q\right) $. If this is zero, $x - p$ divides $p\left( x\right) $.
+In addition, if $\left( \mathrm{ rem }\left( p\right)  + \mathrm{ extra }\left( p, q\right) \right) \bmod \left( 2 q\right) $ is zero, 
+$x - \left( p + q\right) $ is a potential candidate.
+
+
+<p>
+Other efficiencies are derived from the fact that the operations
+are done in binary. Eg. if $q = 2 ^{n}$, then $q_\mathrm{ next } = 2 ^{n + 1} = 2 q = q&lt;&lt;1$ is 
+used in the next iteration. Also, calculations modulo $2 ^{n}$
+are equivalent to performing a bitwise and with $2 ^{n} - 1$. These
+operations can in general be performed efficiently on 
+todays hardware which is based on binary representations.
+
+
+<p>
+
+<a name="c3s8">
+
+</a>
+<h2>
+<hr>3.8 Extending the algorithm
+</h2>
+Only univariate polynomials with rational coefficients
+have been considered so far. This could be extended to
+allow for roots that are complex numbers $a + \imath  b$ where 
+both $a$ and $b$ are rational numbers.
+
+
+<p>
+For this to work the division algorithm would have to 
+be extended to handle complex numbers with integer
+$a$ and $b$ modulo some integer, and the initial
+setup of the potential solutions would have to be
+extended to try $x + 1 + \imath $ and $x + \imath $ also. The step where
+new potential solutions modulo $2 ^{n + 1}$ are determined
+should then also test for $x + \imath \cdot 2 ^{n}$ and $x + 2 ^{n} + \imath \cdot 2 ^{n}$.
+
+
+<p>
+The same extension could be made for multivariate polynomials,
+although setting up the initial irreducible polynomials
+that divide $p_\mathrm{ test }\left( x\right) $ modulo 2 might become expensive
+if done on a polynomial with many variables ($2 ^{2 ^{m} - 1}$ trials
+for $m$ variables).
+
+
+<p>
+Lastly, polynomials with real-valued coefficients <i>could</i>
+be factored, if the coefficients were first converted to
+rational numbers. However, for real-valued coefficients
+there exist other methods (Sturm sequences).
+
+
+<p>
+
+<a name="c3s9">
+
+</a>
+<h2>
+<hr>3.9 Newton iteration
+</h2>
+What the <b><tt>BinaryFactor</tt></b> algorithm effectively does is 
+finding a set of potential solutions modulo $2 ^{n + 1}$ when
+given a set of potential solutions modulo $2 ^{n}$.
+There is a better algorithm that does something similar:
+Hensel lifting. Hensel lifting is a generalized form of
+Newton iteration, where given a factorization modulo 
+$p$, each iteration returns a factorization modulo $p ^{2}$.
+
+
+<p>
+Newton iteration is based on the following idea: when one
+takes a Taylor series expansion of a function:
+
+
+<p>
+$$f\left( x _{0} + dx\right) \equiv f\left( x _{0}\right)  + \left( \frac{d}{d x}f\left( x _{0}\right) \right)  dx + \mathrm{ ... }$$
+
+
+<p>
+Newton iteration then proceeds by taking only the first
+two terms in this series, the constant plus the constant
+times $dx$. Given some good initial value $x_0$, the function
+will is assumed to be close to a root, and the function 
+is assumed to be almost linear, hence this approximation.
+Under these assumptions, if we want $f\left( x_0 + dx\right) $ to be zero,
+
+
+<p>
+$$f\left( x _{0} + dx\right)  = f\left( x _{0}\right)  + \left( \frac{d}{d x}f\left( x _{0}\right) \right)  dx = 0$$
+
+
+<p>
+This yields:
+
+
+<p>
+$$dx\equiv  - \frac{f\left( x _{0}\right) }{\frac{d}{d x}f\left( x _{0}\right) }  = 0$$
+
+
+<p>
+And thus a next, better, approximation for the root is
+$x _{1}\equiv x_0 - \frac{f\left( x _{0}\right) }{\frac{d}{d x}f\left( x _{0}\right) } $, or more general:
+
+
+<p>
+$$x _{n + 1} = x _{n} - \frac{f\left( x _{n}\right) }{\frac{\partial}{\partial x}f\left( x _{n}\right) } $$
+
+
+<p>
+If the root has multiplicity one, a Newton iteration can
+converge <i>quadratically</i>, meaning the number of 
+decimals precision for each iteration doubles.
+
+
+<p>
+As an example, we can try to find a root of $\sin x$ near
+$3$, which should converge to $\pi $.
+
+
+<p>
+Setting precision to 30 digits,
+<table cellpadding="0" width="100%">
+<tr><td width=100% bgcolor="#DDDDEE"><pre>
+In&gt; Builtin'Precision'Set(30)
+Out&gt; True;
+</pre></tr>
+</table>
+
+
+<p>
+We first set up a function $dx\left( x\right) $:
+<table cellpadding="0" width="100%">
+<tr><td width=100% bgcolor="#DDDDEE"><pre>
+In&gt; dx(x):=Eval(-Sin(x)/(D(x)Sin(x)))
+Out&gt; True;
+</pre></tr>
+</table>
+
+
+<p>
+And we start with a good initial approximation to $\pi $,
+namely $3$. Note we should set <b><tt>x</tt></b> <i>after</i> we set
+dx(x), as the right hand side of the function definition is
+evaluated. We could also have used a different parameter name
+for the definition of the function $dx\left( x\right) $.
+
+
+<p>
+<table cellpadding="0" width="100%">
+<tr><td width=100% bgcolor="#DDDDEE"><pre>
+In&gt; x:=3
+Out&gt; 3;
+</pre></tr>
+</table>
+
+
+<p>
+We can now start the iteration:
+
+
+<p>
+<table cellpadding="0" width="100%">
+<tr><td width=100% bgcolor="#DDDDEE"><pre>
+In&gt; x:=N(x+dx(x))
+Out&gt; 3.142546543074277805295635410534;
+In&gt; x:=N(x+dx(x))
+Out&gt; 3.14159265330047681544988577172;
+In&gt; x:=N(x+dx(x))
+Out&gt; 3.141592653589793238462643383287;
+In&gt; x:=N(x+dx(x))
+Out&gt; 3.14159265358979323846264338328;
+In&gt; x:=N(x+dx(x))
+Out&gt; 3.14159265358979323846264338328;
+</pre></tr>
+</table>
+
+
+<p>
+As shown, in this example the iteration converges quite
+quickly. 
+
+
+<p>
+
+<h3>
+<hr>Finding roots of multiple equations in multiple variables using Newton iteration
+</h3>
+One generalization, mentioned in W.H. Press et al., 
+<i>NUMERICAL RECIPES in C, The Art of Scientific computing</i>
+is finding roots for multiple functions in multiple variables.
+
+
+<p>
+Given $N$ functions in $N$ variables, we want to solve
+
+
+<p>
+$$f_i\left( x _{1}, \mathrm{ ... }, x _{N}\right)  = 0$$
+
+
+<p>
+for $i = 1..N$. If de denote by $\mathrm{X}$ the vector 
+$$ X := <b><tt>x[1],x[2],...,x[N]</tt></b> $$
+
+
+<p>
+and by $dX$ the delta vector, then one can write
+
+
+<p>
+$$f_i\left( \mathrm{X} + dX\right) \equiv f_i\left( \mathrm{X}\right)  + \sum _{j = 1} ^{N} \left( \frac{\partial}{\partial x_j}f_i\left( \mathrm{X}\right) \right)  dx _{j}$$
+
+
+<p>
+Setting $f_i\left( \mathrm{X} + dX\right) $ to zero, one obtains
+
+
+<p>
+$$\sum _{j = 1} ^{N} a _{\left( i, j\right) } dx_j = b _{i}$$
+
+
+<p>
+where
+
+
+<p>
+$$a _{\left( i, j\right) }\equiv \frac{\partial}{\partial x_j}f_i\left( \mathrm{X}\right) $$
+
+
+<p>
+and
+
+
+<p>
+$$b_i\equiv  - f_i\left( \mathrm{X}\right) $$
+
+
+<p>
+So the generalization is to first initialize $\mathrm{X}$ to a good
+initial value, calculate the matrix elements $a _{\left( i, j\right) }$ and
+the vector $b _{i}$, and then to proceed to calculate $dX$
+by solving the matrix equation, and calculating 
+
+
+<p>
+$$\mathrm{X} _{i + 1}\equiv \mathrm{X} _{i} + dX _{i}$$
+
+
+<p>
+In the case of one function with one variable, the summation
+reduces to one term, so this linear set of equations was
+a lot simpler in that case. In this case we will have to solve
+this set of linear equations in each iteration.
+
+
+<p>
+As an example, suppose we want to find the zeroes for the
+following two functions:
+
+
+<p>
+$$f_1\left( a, x\right) \equiv \sin a x$$
+
+
+<p>
+and
+
+
+<p>
+$$f_2\left( a, x\right) \equiv a - 2$$
+
+
+<p>
+It is clear that the solution to this is $a = 2$ and $x\equiv N \frac{\pi }{2} $
+for any integer value $N$.
+
+
+<p>
+We will do calculations with precision 30:
+<table cellpadding="0" width="100%">
+<tr><td width=100% bgcolor="#DDDDEE"><pre>
+In&gt; Builtin'Precision'Set(30)
+Out&gt; True;
+</pre></tr>
+</table>
+
+
+<p>
+And set up a vector of functions $<b><tt>f_1(X),f_2(X)</tt></b>$
+where $X:=<b><tt>a,x</tt></b>$
+<table cellpadding="0" width="100%">
+<tr><td width=100% bgcolor="#DDDDEE"><pre>
+In&gt; f(a,x):={Sin(a*x),a-2}
+Out&gt; True;
+</pre></tr>
+</table>
+
+
+<p>
+Now we set up a function <b><tt>matrix(a,x)</tt></b> which returns the
+matrix $a _{\left( i, j\right) }$:
+
+
+<p>
+<table cellpadding="0" width="100%">
+<tr><td width=100% bgcolor="#DDDDEE"><pre>
+In&gt; matrix(a,x):=Eval({D(a)f(a,x),D(x)f(a,x)})
+Out&gt; True;
+</pre></tr>
+</table>
+
+
+<p>
+We now set up some initial values:
+
+
+<p>
+<table cellpadding="0" width="100%">
+<tr><td width=100% bgcolor="#DDDDEE"><pre>
+In&gt; {a,x}:={1.5,1.5}
+Out&gt; {1.5,1.5};
+</pre></tr>
+</table>
+
+
+<p>
+The iteration converges a lot slower for this example, so we
+will loop 100 times:
+
+
+<p>
+<table cellpadding="0" width="100%">
+<tr><td width=100% bgcolor="#DDDDEE"><pre>
+In&gt; For(ii:=1,ii&lt;100,ii++)[{a,x}:={a,x}+\
+   N(SolveMatrix(matrix(a,x),-f(a,x)));]
+Out&gt; True;
+In&gt; {a,x}
+Out&gt; {2.,0.059667311457823162437151576236};
+</pre></tr>
+</table>
+
+
+<p>
+The value for $a$ has already been found. Iterating a
+few more times:
+
+
+<p>
+<table cellpadding="0" width="100%">
+<tr><td width=100% bgcolor="#DDDDEE"><pre>
+In&gt; For(ii:=1,ii&lt;100,ii++)[{a,x}:={a,x}+\
+   N(SolveMatrix(matrix(a,x),-f(a,x)));]
+Out&gt; True;
+In&gt; {a,x}
+Out&gt; {2.,-0.042792753588155918852832259721};
+In&gt; For(ii:=1,ii&lt;100,ii++)[{a,x}:={a,x}+\
+   N(SolveMatrix(matrix(a,x),-f(a,x)));]
+Out&gt; True;
+In&gt; {a,x}
+Out&gt; {2.,0.035119151349413516969586788023};
+</pre></tr>
+</table>
+
+
+<p>
+the value for $x$ converges a lot slower this time, and to the uninteresting
+value of zero (a rather trivial zero of this set of functions).
+In fact for all integer values $N$ the value $N \frac{\pi }{2} $ is a solution.
+Trying various initial values will find them.
+
+
+<p>
+
+<h3>
+<hr>Newton iteration on polynomials
+</h3>
+von zur Gathen et al., <i>Modern Computer algebra</i> discusses
+taking the inverse of a polynomial using Newton iteration.
+The task is, given a polynomial $f\left( x\right) $, to find a polynomial
+$g\left( x\right) $ such that $f\left( x\right)  = \frac{1}{g\left( x\right) } $, modulo some power in x.
+This implies that we want to find a polynom $g$ for which:
+
+
+<p>
+$$h\left( g\right)  = \frac{1}{g}  - f = 0$$
+
+
+<p>
+Applying a Newton iteration step $g _{i + 1} = g _{i} - \frac{h\left( g _{i}\right) }{\frac{\partial}{\partial g}h\left( g _{i}\right) } $
+to this expression yields:
+
+
+<p>
+$$g _{i + 1} = 2 g _{i} - f g _{i} ^{2}$$
+
+
+<p>
+von zur Gathen then proves by induction that for $f\left( x\right) $ monic,
+and thus $f\left( 0\right)  = 1$, given initial value $g_0\left( x\right)  = 1$, that
+
+
+<p>
+$$\left( f g_i = 1\right) \bmod x ^{2 ^{i}}$$
+
+
+<p>
+Example:
+
+
+<p>
+suppose we want to find the polynomial $g\left( x\right) $ up to the 7th degree
+for which $\left( f\left( x\right)  g\left( x\right)  = 1\right) \bmod x ^{8}$, for the function
+
+
+<p>
+$$f\left( x\right) \equiv 1 + x + \frac{x ^{2}}{2}  + \frac{x ^{3}}{6}  + \frac{x ^{4}}{24} $$
+
+
+<p>
+First we define the function f:
+
+
+<p>
+<table cellpadding="0" width="100%">
+<tr><td width=100% bgcolor="#DDDDEE"><pre>
+In&gt; f:=1+x+x^2/2+x^3/6+x^4/24
+Out&gt; x+x^2/2+x^3/6+x^4/24+1;
+</pre></tr>
+</table>
+
+
+<p>
+And initialize $g$ and $i$.
+
+
+<p>
+<table cellpadding="0" width="100%">
+<tr><td width=100% bgcolor="#DDDDEE"><pre>
+In&gt; g:=1
+Out&gt; 1;
+In&gt; i:=0
+Out&gt; 0;
+</pre></tr>
+</table>
+
+
+<p>
+Now we iterate, increasing $i$, and replacing $g$ with the
+new value for $g$:
+
+
+<p>
+<table cellpadding="0" width="100%">
+<tr><td width=100% bgcolor="#DDDDEE"><pre>
+In&gt; [i++;g:=BigOh(2*g-f*g^2,x,2^i);]
+Out&gt; 1-x;
+In&gt; [i++;g:=BigOh(2*g-f*g^2,x,2^i);]
+Out&gt; x^2/2-x^3/6-x+1;
+In&gt; [i++;g:=BigOh(2*g-f*g^2,x,2^i);]
+Out&gt; x^7/72-x^6/72+x^4/24-x^3/6+x^2/2-x+1;
+</pre></tr>
+</table>
+
+
+<p>
+The resulting expression must thus be:
+
+
+<p>
+$$g\left( x\right) \equiv \frac{x ^{7}}{72}  - \frac{x ^{6}}{72}  + \frac{x ^{4}}{24}  - \frac{x ^{3}}{6}  + \frac{x ^{2}}{2}  - x + 1$$
+
+
+<p>
+We can easily verify this:
+
+
+<p>
+<table cellpadding="0" width="100%">
+<tr><td width=100% bgcolor="#DDDDEE"><pre>
+In&gt; Expand(f*g)
+Out&gt; x^11/1728+x^10/576+x^9/216+(5*x^8)/576+1;
+</pre></tr>
+</table>
+
+
+<p>
+This expression is 1 modulo $x ^{8}$, as can easily be shown:
+
+
+<p>
+<table cellpadding="0" width="100%">
+<tr><td width=100% bgcolor="#DDDDEE"><pre>
+In&gt; BigOh(%,x,8)
+Out&gt; 1;
+</pre></tr>
+</table>
+
+
+<p>
+
+
+<script src="http://www.google-analytics.com/urchin.js" type="text/javascript">
+</script>
+<script type="text/javascript">
+_uacct = "UA-2425144-1";
+urchinTracker();
+</script>
+</body>
+
+</html>

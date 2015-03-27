@@ -1,0 +1,2613 @@
+<html>
+<head>
+  <title>Numerical algorithms I: basic methods</title>
+  <link rel="stylesheet" href="yacas.css" TYPE="text/css" MEDIA="screen">
+  <script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
+    });
+  </script>
+  <script type="text/javascript"
+    src="https://c328740.ssl.cf1.rackcdn.com/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+</head>
+<body>
+<a name="c4">
+
+</a>
+<h1>
+4. Numerical algorithms I: basic methods
+</h1>
+This and subsequent chapters document the numerical algorithms used in
+Yacas for exact integer calculations as well as for multiple precision
+floating-point calculations. We give self-contained descriptions of
+the non-trivial algorithms and estimate their computational cost.
+Most of the algorithms were taken from referenced literature; the remaining algorithms were developed by us.
+
+<p> </p>
+
+<p>
+
+<a name="c4s1">
+
+</a>
+<h2>
+<hr>4.1 Adaptive function plotting
+</h2>
+Here we consider plotting of functions $y = f\left( x\right) $.
+
+
+<p>
+There are two tasks related to preparation of plots of functions: first, to produce the numbers required for a plot, and second, to draw a plot with axes, symbols, a legend, perhaps additional illustrations and so on.
+Here we only concern ourselves with the first task, that of preparation of the numerical data for a plot.
+There are many plotting programs that can read a file with numbers and plot it in any desired manner.
+
+
+<p>
+Generating data for plots of functions generally does not require
+high-precision calculations.
+However, we need an algorithm that can be adjusted to produce data to different levels of precision.
+In some particularly ill-behaved cases, a precise plot will not be possible and we would not want to waste time producing data that is too accurate for what it is worth.
+
+
+<p>
+
+<a name="plotting!adaptive algorithms">
+
+</a>
+<a name="plotting!two-dimensional">
+
+</a>
+<a name="Plot2D'adaptive@\relax <b><tt>Plot2D'adaptive</tt></b>">
+
+</a>
+A simple approach to plotting would be to divide the interval into many equal subintervals and to evaluate the function on the resulting grid.
+Precision of the plot can be adjusted by choosing a larger or a smaller number of points.
+
+
+<p>
+However, this approach is not optimal. Sometimes a function changes rapidly near one point but slowly everywhere else.
+For example, $f\left( x\right)  = \frac{1}{x} $ changes very quickly at small $x$.
+Suppose we need to plot this function between $0$ and $100$.
+It would be wasteful to use the same subdivision interval everywhere: a finer grid is only required over a small portion of the plotting range near $x = 0$.
+
+
+<p>
+The adaptive plotting routine <b><tt>Plot2D'adaptive</tt></b> uses a simple algorithm
+to select the optimal grid to approximate a function of one argument $f\left( x\right) $.
+The algorithm repeatedly subdivides the grid intervals near points where the existing grid does not represent the function well enough.
+A similar algorithm
+for adaptive grid refinement could be used for numerical integration. The
+idea is that plotting and numerical integration require the same kind of
+detailed knowledge about the behavior of the function.
+
+
+<p>
+The algorithm first splits the interval into a specified initial number of
+equal subintervals, and then repeatedly splits each subinterval in half
+until the function is well enough approximated by the resulting grid. The
+integer parameter <b><tt>depth</tt></b> gives the maximum number of binary splittings for
+a given initial interval; thus, at most $2 ^{\mathrm{ depth }}$ additional grid points
+will be generated. The function <b><tt>Plot2D'adaptive</tt></b> should return a list of
+pairs of points <b><tt>{{x1,y1}, {x2,y2}, ...}</tt></b> to be used directly for plotting.
+
+
+<p>
+The adaptive plotting algorithm works like this:
+
+
+<p>
+<ul><li> 1.  Given an interval (</li>$a$, $c$), we split
+it in half, $b\equiv \frac{a + c}{2} $ and first compute $f\left( x\right) $ at five grid
+points $a$, $a _{1}\equiv \frac{a + b}{2} $, $b$, $b _{1}\equiv \frac{b + c}{2} $, $c$. 
+<li> 2. If currently </li>$\mathrm{ depth }\leq 0$, return this list of five points and
+values because we cannot refine the grid any more.
+<li> 3. Otherwise, check that the function does not oscillate too
+rapidly on the interval [</li>$a$, $c$]. 
+The formal criterion is that the five values are all finite and do not make a "zigzag" pattern
+such as (1,3,2,3,1).
+More formally, we use the following procedure:
+For each three consecutive values, write "1" if the middle value is larger
+than the other two, or if it is smaller than the other two,
+or if one of them is not a number (e.g. <b><tt>Infinity</tt></b> or <b><tt>Undefined</tt></b>).
+If we have at most two ones now, then we consider the change of values to be
+"slow enough". Otherwise it is not "slow enough".
+In this case we need to refine the grid; go to step 5. 
+Otherwise, go to step 4.
+<li> 4. Check that the function values are smooth enough through the
+interval. Smoothness is controlled by a parameter </li>$\epsilon $. The
+meaning of the parameter $\epsilon $ is the (relative) error of the
+numerical approximation of the integral of $f\left( x\right) $ by the grid. A good heuristic
+value of $\epsilon $ is 1/(the number of pixels on the screen)
+because it means that no pixels will be missing in the area under
+the graph. For this to work we need to make sure that we are actually computing the area <i>under</i> the graph; so we define $g\left( x\right) \equiv f\left( x\right)  - f _{0}$ where $f _{0}$ is the minimum of the values of $f\left( x\right) $ on the five grid points $a$, $a _{1}$, $b$, $b _{1}$, and $c$; the function $g\left( x\right) $ is nonnegative and has the minimum value 0.
+Then we compute two different Newton-Cotes quadratures
+for $\int _{b} ^{b _{1} } g\left( x\right)  dx$ using these five points. (Asymmetric
+quadratures are chosen to avoid running into an accidental symmetry of the
+function; the first quadrature uses points $a$, $a _{1}$, $b$, $b _{1}$ and the second
+quadrature uses $b$, $b _{1}$, $c$.) If the
+absolute value of the difference between these quadratures is less
+than $\epsilon $ * (value of the second quadrature), then we
+are done and we return the list of these five points and values.
+<li> 5. Otherwise, we need to refine the grid. We compute
+</li><b><tt>Plot2D'adaptive</tt></b> recursively for the two halves of the interval,
+that is, for ($a$, $b$) and ($b$, $c$).
+We also decrease <b><tt>depth</tt></b> by 1 and multiply $\epsilon $ by 2 because we need to maintain a constant <i>absolute</i> precision and this means that the relative error for the two subintervals can be twice as large.
+The resulting two lists for the two subintervals are
+concatenated (excluding the double value at point $b$) and
+returned.
+</ul>
+
+<p>
+This algorithm works well if the initial number of points and the <b><tt>depth</tt></b>
+parameter are large enough.
+These parameters can be adjusted to balance the available computing time and the desired level of detail in the resulting plot.
+
+
+<p>
+Singularities in the function are handled by the step 3.
+Namely, the change in the sequence $a$, $a _{1}$, $b$, $b _{1}$, $c$ is always considered to be "too rapid" if one of these values is a non-number (e.g. <b><tt>Infinity</tt></b> or <b><tt>Undefined</tt></b>).
+Thus, the interval immediately adjacent to a singularity will be plotted at the highest allowed refinement level. When preparing the plotting data, the singular points are simply not printed to the data file, so that
+a plotting programs does not encounter any problems.
+
+
+<p>
+
+<h3>
+<hr>Newton-Cotes quadratures
+</h3>
+<a name="Newton-Cotes quadratures">
+
+</a>
+The meaning of Newton-Cotes quadrature coefficients is that an integral of a function $f\left( x\right) $ is approximated by a sum,
+$$\int _{a _{0}} ^{a _{n} } f\left( x\right)  dx\approx h \sum _{k = 0} ^{n} c _{k} f\left( a _{k}\right) ,$$
+where $a _{k}$ are the grid points, $h\equiv a _{1} - a _{0}$ is the grid step, and
+$c _{k}$ are the quadrature coefficients.
+It may seem surprising, but these coefficients $c _{k}$ are independent
+of the function $f\left( x\right) $ and can be precomputed
+in advance for a given grid $a _{k}$.
+[The quadrature coefficients do depend on the relative separations of the grid.
+Here we assume a uniform grid with a constant step $h = a _{k} - a _{k - 1}$.
+Quadrature coefficients can also be found for non-uniform grids.]
+
+
+<p>
+The coefficients $c _{k}$ for
+grids with a constant step $h$ can be found, for example, by solving the following system of equations,
+$$\sum _{k = 0} ^{n} c _{k} k ^{p} = \frac{n ^{p + 1}}{p + 1} $$
+for $p = 0$, 1, ..., $n$. This system of equations means that the quadrature correctly gives the integrals of $p + 1$ functions $f\left( x\right)  = x ^{p}$, $p = 0$, 1, ..., $n$, over the interval (0, $n$).
+The solution of this system always exists and gives quadrature coefficients as rational numbers. For example, the well-known Simpson quadrature $c _{0} = \frac{1}{3} $, $c _{1} = \frac{4}{3} $, $c _{2} = \frac{1}{3} $ is obtained with $n = 2$.
+An example of using this quadrature is the approximation
+$$\int _{0} ^{2 } f\left( x\right)  dx\approx \frac{f\left( 0\right)  + f\left( 2\right) }{3}  + \frac{4}{3}  f\left( 1\right) .$$
+
+
+<p>
+
+<a name="Newton-Cotes quadratures!for partial intervals">
+
+</a>
+In the same way it is possible to find quadratures for the integral over a subinterval rather than over the whole interval of $x$. In the current implementation of the adaptive plotting algorithm, two quadratures are used: the 3-point quadrature ($n = 2$) and the 4-point quadrature ($n = 3$) for the integral over the first subinterval, $\int _{a _{0}} ^{a _{1} } f\left( x\right)  dx$. Their coefficients are ($\frac{5}{12} $, $\frac{2}{3} $, $ - \frac{1}{12} $) and ($\frac{3}{8} $, $\frac{19}{24} $, $ - \frac{5}{24} $, $\frac{1}{24} $).
+An example of using the first of these subinterval quadratures would be the approximation
+$$\int _{0} ^{1 } f\left( x\right)  dx\approx \frac{5}{12}  f\left( 0\right)  + \frac{2}{3}  f\left( 1\right)  - \frac{1}{12}  f\left( 2\right) .$$
+These quadratures are intentionally chosen to be asymmetric to avoid an accidental cancellation when the function $f\left( x\right) $ itself is symmetric.
+(Otherwise the error estimate could accidentally become exactly zero.)
+
+
+<p>
+
+<a name="c4s2">
+
+</a>
+<h2>
+<hr>4.2 Surface plotting
+</h2>
+Here we consider plotting of functions $z = f\left( x, y\right) $.
+
+
+<p>
+
+<a name="plotting!of surfaces">
+
+</a>
+<a name="plotting!three-dimensional">
+
+</a>
+The task of surface plotting is to obtain a picture of a two-dimensional surface as if it were a solid object in three dimensions.
+A graphical representation of a surface is a complicated task.
+Sometimes it is required to use particular coordinates or projections, to colorize the surface, to remove hidden lines and so on.
+We shall only be concerned with the task of obtaining the data for a plot from a given function of two variables $f\left( x, y\right) $.
+Specialized programs can take a text file with the data and let the user interactively produce a variety of surface plots.
+
+
+<p>
+The currently implemented algorithm in the function <b><tt>Plot3DS</tt></b> is very similar to the adaptive plotting algorithm for two-dimensional plots.
+A given rectangular plotting region $a _{1}\leq x\leq a _{2}$, $b _{1}\leq y\leq b _{2}$ is subdivided to produce an equally spaced rectangular grid of points.
+This is the initial grid which will be adaptively refined where necessary.
+The refinement algorithm will divide a given rectangle in four quarters if the available function values indicate that the function does not change smoothly enough on that rectangle.
+
+
+<p>
+The criterion of a "smooth enough" change is very similar to the procedure outlined in the previous section.
+The change is "smooth enough" if all points are finite, nonsingular values, and if the integral of the function over the rectangle is sufficiently well approximated by a certain low-order "cubature" formula.
+
+
+<p>
+The two-dimensional integral of the function is estimated using the following 5-point Newton-Cotes cubature:
+
+
+<p>
+<table cellpadding="0" width="100%">
+<tr><td width=100% bgcolor="#DDDDEE"><pre>
+1/12   0   1/12
+
+ 0    2/3   0
+
+1/12   0   1/12
+</pre></tr>
+</table>
+
+
+<p>
+An example of using this cubature would be the approximation
+$$\int _{0} ^{1 } \int _{0} ^{1 } f\left( x, y\right)  dx dy\approx \frac{f\left( 0, 0\right)  + f\left( 0, 1\right)  + f\left( 1, 0\right)  + f\left( 1, 1\right) }{12} $$
+$$ + \frac{2}{3}  f\left( \frac{1}{2} , \frac{1}{2} \right) .$$
+
+
+<p>
+Similarly, an 8-point cubature with zero sum is used to estimate the error:
+
+
+<p>
+<table cellpadding="0" width="100%">
+<tr><td width=100% bgcolor="#DDDDEE"><pre>
+-1/3   2/3   1/6
+
+-1/6  -2/3  -1/2
+
+ 1/2    0    1/3
+</pre></tr>
+</table>
+This set of coefficients was intentionally chosen to be asymmetric to avoid possible exact cancellations when the function itself is symmetric.
+
+
+<p>
+One minor problem with adaptive surface plotting is that the resulting set of points may not correspond to a rectangular grid in the parameter space ($x$,$y$).
+This is because some rectangles from the initial grid will need to be bisected more times than others.
+So, unless adaptive refinement is disabled, the function <b><tt>Plot3DS</tt></b> produces a somewhat disordered set of points.
+However, most surface plotting programs require that the set of data points be a rectangular grid in the parameter space.
+So a smoothing and interpolation procedure is necessary to convert a non-gridded set of data points ("scattered" data) to a gridded set.
+
+
+<p>
+
+<a name="c4s3">
+
+</a>
+<h2>
+<hr>4.3 Parametric plots
+</h2>
+<a name="plotting!parametric">
+
+</a>
+Currently, parametric plots are not directly implemented in Yacas.
+However, it is possible to use Yacas to obtain numerical data for such plots.
+One can then use external programs to produce actual graphics.
+
+
+<p>
+A two-dimensional parametric plot is a line in a two-dimensional space, defined by two equations such as $x = f\left( t\right) $, $y = g\left( t\right) $.
+Two functions $f$, $g$ and a range of the independent variable $t$, for example, $t _{1}\leq t\leq t _{2}$, need to be specified.
+
+
+<p>
+
+<a name="plotting!non-Euclidean coordinates">
+
+</a>
+Parametric plots can be used to represent plots of functions in non-Euclidean coordinates.
+For example, to plot the function $\rho  = \left( \cos 4 \phi \right)  ^{2}$ in polar coordinates ($\rho $,$\phi $), one can rewrite the Euclidean coordinates through the polar   coordinates,
+$x = \rho  \cos \phi $,
+$y = \rho  \sin \phi $,
+and use the equivalent parametric plot with $\phi $ as the parameter:
+$x = \left( \cos 4 \phi \right)  ^{2} \cos \phi $,
+$y = \left( \cos 4 \phi \right)  ^{2} \sin \phi $.
+
+
+<p>
+
+<a name="plotting!three-dimensional">
+
+</a>
+Sometimes higher-dimensional parametric plots are required.
+A line plot in three dimensions is defined by three functions of one variable, for example, $x = f\left( t\right) $, $y = g\left( t\right) $, $z = h\left( t\right) $, and a range of the parameter $t$.
+A surface plot in three dimensions is defined by three functions of two variables each, for example, $x = f\left( u, v\right) $, $y = g\left( u, v\right) $, $z = h\left( u, v\right) $, and a rectangular domain in the ($u$,$v$) space.
+
+
+<p>
+The data for parametric plots can be generated separately using the same adaptive plotting algorithms as for ordinary function plots,
+as if all functions such as $f\left( t\right) $ or $g\left( u, v\right) $ were unrelated functions.
+The result would be several separate data sets for the $x$, $y$, ... coordinates.
+These data sets could then be combined using an interactive plotting program.
+
+
+<p>
+
+<a name="c4s4">
+
+</a>
+<h2>
+<hr>4.4 The cost of arbitrary-precision computations
+</h2>
+A computer algebra system absolutely needs to be able to perform
+computations with very large <i>integer</i>  numbers. Without this
+capability, many symbolic computations (such as exact GCD of
+polynomials or exact solution of polynomial equations) would be
+impossible.
+
+
+<p>
+
+<a name="arbitrary-precision computation">
+
+</a>
+A different question is whether a CAS really needs to be able to
+evaluate, say, 10,000 digits of the value of a Bessel function of some
+10,000-digit complex argument.
+It seems likely that no applied problem of
+natural sciences would need floating-point computations of special
+functions with such a high precision. However, arbitrary-precision
+computations are certainly useful in some mathematical applications;
+e.g. some mathematical identities can be first guessed by a floating-point
+computation with many digits and then proved.
+
+
+<p>
+Very high precision computations of special functions <i>might</i> be useful in the future.
+But it is already quite clear that computations with moderately high
+precision (say, 50 or 100 decimal digits) are useful for applied problems.
+For example, to obtain the leading asymptotic of an analytic function, we could expand it in series and take the first term.
+But we need to check that the coefficient at what we think is the leading term of the series does not vanish.
+This coefficient could be a certain "exact" number such as $\left( \cos 355 + 1\right)  ^{2}$.
+This number is "exact" in the sense that it is made of integers and elementary functions.
+But we cannot say <i>a priori</i> that this number is nonzero.
+The problem of "zero determination" (finding out whether a certain "exact" number is zero)
+is known to be algorithmically unsolvable if we allow transcendental functions.
+The only practical general approach seems to be to compute the number in question with many digits.
+Usually a few digits are enough, but occasionally several hundred digits are needed.
+
+
+<p>
+Implementing an efficient algorithm that computes 100 digits of
+$\sin \frac{3}{7} $ already involves many of the issues that would also be
+relevant for a 10,000 digit computation. 
+Modern algorithms allow evaluations of all elementary functions in time
+that is asymptotically logarithmic in the number of digits $P$ and
+linear in the cost of long multiplication (usually denoted $M\left( P\right) $).
+Almost all special functions can be evaluated in time that is asymptotically linear in $P$ and in $M\left( P\right) $.
+(However, this asymptotic cost sometimes applies only to very high precision, e.g., $P &gt; 1000$, and different algorithms need to be implemented for calculations in lower precision.)
+
+
+<p>
+In <b><tt>Yacas</tt></b> we strive to implement all numerical functions to arbitrary precision.
+All integer or rational functions return exact
+results, and all floating-point functions return their value with $P$
+correct decimal digits (assuming sufficient precision of the arguments).
+The current value of $P$ is accessed as
+<b><tt>Builtin'Precision'Get()</tt></b> and may be changed by <b><tt>Builtin'Precision'Set(...)</tt></b>.
+
+
+<p>
+
+<a name="arbitrary-precision computation!requirements">
+
+</a>
+Implementing an arbitrary-precision floating-point computation of a
+function $f\left( x\right) $, such as $f\left( x\right)  = \exp \left( x\right) $, typically needs the following:
+
+
+<p>
+<ul><li>An algorithm that will compute </li>$f\left( x\right) $ for a given value $x$ to a
+user-specified precision of $P$ (decimal) digits. Often, several
+algorithms must be implemented for different subdomains of the
+($x$,$P$) space.
+<li>An estimate of the computational cost of the algorithm(s), as a function of </li>$x$ and $P$. This is needed to select the best algorithm for given $x$, $P$.
+<li>An estimate of the round-off error.
+This is needed to select the "working precision" which will typically be somewhat higher than the precision of the final result.
+</li></ul>
+
+<p>
+In calculations with machine precision where the number of digits is fixed, the problem of round-off errors is quite prominent.
+Every arithmetic operation causes a small loss of precision;
+as a result, a few last digits of the final value are usually incorrect.
+But if we have an arbitrary precision capability, we can always increase precision by a few more digits during intermediate computations and thus eliminate all round-off error in the final result.
+We should, of course, take care not to increase the working precision unnecessarily, because any increase of precision means slower calculations.
+Taking twice as many digits as needed and hoping that the result is precise is not a good solution.
+
+
+<p>
+Selecting algorithms for computations is the most non-trivial part of
+the implementation.
+We want to achieve arbitrarily high precision, so
+we need to find either a series, or a continued fraction, or a
+sequence given by explicit formula, that converges to the function in a
+controlled way.
+It is not enough to use a table of precomputed values
+or a fixed approximation formula that has a limited precision.
+
+
+<p>
+In the last 30 years, the interest in arbitrary-precision
+computations grew and many efficient algorithms for elementary and
+special functions were published.
+Most algorithms are iterative.
+Almost always it is very important to know in advance how many iterations
+are needed for given $x$, $P$.
+This knowledge allows to estimate the computational cost, in terms of
+the required precision $P$ and of the cost of long multiplication
+$M\left( P\right) $, and choose the best algorithm.
+
+
+<p>
+Typically all operations will fall into one of the following categories
+(sorted by the increasing cost):
+
+
+<p>
+
+<a name="arbitrary-precision computation!speed estimates">
+
+</a>
+<ul><li>addition, subtraction: linear in </li>$P$;
+<li>multiplication, division, integer power, integer root: linear in </li>$M\left( P\right) $;
+<li>elementary functions: </li>$\exp \left( x\right) $, $\ln x$, $\sin x$, $\arctan x$ etc.: $M\left( P\right)  \ln P$ or slower by some powers of $\ln P$;
+<li>transcendental functions: </li>$\mathrm{erf}\, x$, $\Gamma \left( x\right) $ etc.: typically $P M\left( P\right) $ or slower.
+</ul>
+
+<p>
+The cost of long multiplication $M\left( P\right) $ is between $O\left( P ^{2}\right) $ for low precision and $O\left( P \ln P\right) $ for very high precision.
+In some cases, a different algorithm should be chosen if the precision is high enough to allow $M\left( P\right) $ faster than $O\left( P ^{2}\right) $.
+
+
+<p>
+Some algorithms also need storage space
+(e.g. an efficient algorithm for summation of the Taylor series uses $O\left( \ln P\right) $ temporary $P$-digit numbers).
+
+
+<p>
+Below we shall normally denote by $P$ the required number of decimal digits.
+The formulae frequently contain conspicuous factors of $\ln 10$, so it will be clear how to obtain analogous expressions for another base.
+(Most implementations use a binary base rather than a decimal base since it is more convenient for many calculations.)
+
+
+<p>
+
+<a name="c4s5">
+
+</a>
+<h2>
+<hr>4.5 Estimating convergence of a series
+</h2>
+<a name="Taylor series!required number of terms">
+
+</a>
+Analyzing convergence of a power series is usually not difficult.
+Here is a worked-out example of how we could estimate the required number of terms in the power series
+$$\exp \left( x\right)  = 1 + x + \frac{x ^{2}}{2!}  + \mathrm{ ... } + \frac{x ^{n}}{n!}  + O\left( x ^{n + 1}\right) $$
+if we need $P$ decimal digits of precision in the result.
+To be specific, assume that
+$\left| x\right|  &lt; 1$. (A similar calculation can be done for any other bound on $x$.)
+
+
+<p>
+Suppose we truncate the series after $n$-th term and
+the series converges "well enough" after that term. Then the error will be
+approximately equal to the first term we dropped. (This is what we
+really mean by "converges well enough" and this will generally be the case in all applications, because we would not want to use a series that does not converge well enough.)
+
+
+<p>
+The term we dropped is $\frac{x ^{n + 1}}{\left( n + 1\right) !} $.
+To estimate $n!$ for large $n$, one can use the inequality
+$$e ^{e - 1} \left( \frac{n}{e} \right)  ^{n} &lt; n! &lt; \left( \frac{n}{e} \right)  ^{n + 1}$$
+(valid for all $n\geq 47$) which provides tight bounds for the growth of
+the factorial, or a weaker inequality which is somewhat easier to use,
+$$\left( \frac{n}{e} \right)  ^{n} &lt; n! &lt; \left( \frac{n + 1}{e} \right)  ^{n + 1}$$
+(valid for all $n\geq 6$). The latter inequality is sufficient for most purposes.
+
+
+<p>
+If we use the upper bound on $n!$ from this estimate, we find that the term we dropped is bounded by
+$$\frac{x ^{n + 1}}{\left( n + 1\right) !}  &lt; \left( \frac{e}{n + 2} \right)  ^{n + 2}.$$
+We need this number to be smaller than $10 ^{ - P}$. This leads to an inequality
+$$\left( \frac{e}{n + 2} \right)  ^{n + 2} &lt; 10 ^{ - P},$$
+which we now need to solve for $n$. The left hand side decreases with growing $n$. So it is clear that the inequality will hold for large enough $n$, say for $n\geq n_{0}$ where $n_{0}$ is an unknown (integer) value. We can take a logarithm of both sides, replace $n$ with $n_{0}$ and obtain the following equation for $n_{0}$:
+$$\left( n_{0} + 2\right)  \ln \frac{n_{0} + 2}{e}  = P \ln 10.$$
+This equation cannot be solved exactly in terms of elementary functions; this is a typical situation in such estimates. However, we do not really need a very precise solution for $n_{0}$; all we need is an estimate of its integer part.
+This is also a typical situation.
+It is acceptable if our approximate value of $n_{0}$ comes out a couple of units higher than necessary, because a couple of extra terms of the Taylor series will not significantly slow down the algorithm (but it is important that we do not underestimate $n_{0}$).
+Finally, we are mostly interested in having a good enough answer for
+large values of $P$.
+
+
+<p>
+We can try to guess the result.
+The largest term on the LHS
+grows as $n_{0} \ln n_{0}$ and it should be approximately equal to
+$P \ln 10$; but $\ln n_{0}$ grows very slowly, so this gives us a hint that
+$n_{0}$ is proportional to $P \ln 10$.
+As a first try, we set $n_{0} = P \ln 10 - 2$
+and compare the RHS with the LHS; we find that we have overshot by a
+factor $\ln P - 1 + \ln \ln 10$, which is not a large factor. We
+can now compensate and divide $n_{0}$ by this factor, so our second try is
+$$n_{0} = \frac{P \ln 10}{\ln P - 1 + \ln \ln 10}  - 2.$$
+(This approximation procedure is equivalent to solving the equation
+$$x = \frac{P \ln 10}{\ln x - 1} $$
+by direct iteration, starting from $x = P \ln 10$.)
+If we substitute our second try for $n_{0}$ into the equation, we shall find that we undershot a little bit (i.e. the LHS is a little smaller than the RHS), but our $n_{0}$ is now smaller than it should be by a quantity that is smaller than 1 for large enough $P$.
+So we should stop at this point and simply add 1 to this approximate answer. We should also replace $\ln \ln 10 - 1$ by 0 for simplicity (this is safe because it will slightly increase $n_{0}$.)
+
+
+<p>
+Our final result is that it is enough to take
+$$n = \frac{P \ln 10}{\ln P}  - 1$$
+terms in the Taylor series to compute $\exp \left( x\right) $ for $\left| x\right|  &lt; 1$ to $P$
+decimal digits. (Of course, if $x$ is much smaller than 1, many fewer
+terms will suffice.)
+
+
+<p>
+
+<a name="c4s6">
+
+</a>
+<h2>
+<hr>4.6 Estimating the round-off error
+</h2>
+<a name="arbitrary-precision computation!round-off error estimates">
+
+</a>
+<h3>
+<hr>Unavoidable round-off errors
+</h3>
+As the required precision $P$ grows, an arbitrary-precision algorithm
+will need more iterations or more terms of the series. So the round-off
+error introduced by every floating-point operation will increase. When
+doing arbitrary-precision computations, we can always perform all
+calculations with a few more digits and compensate for round-off error.
+It is however imperative to know in advance how many more digits we
+need to take for our "working precision". We should also take that
+increase into account when estimating the total cost of the method.
+(In most cases this increase is small.)
+
+
+<p>
+Here is a simple estimate of the normal round-off error in a computation of
+$n$ terms of a power series.
+Suppose that the sum of the series is of order $1$, that the terms monotonically decrease in magnitude, and that adding one term requires two
+multiplications and one addition. If all calculations are performed
+with absolute precision $\epsilon  = 10 ^{ - P}$, then the total accumulated
+round-off error is $3 n \epsilon $. If the relative error is $3 n \epsilon $, it means that our
+answer is something like $a \left( 1 + 3 n \epsilon \right) $ where $a$ is the correct
+answer. We can see that out of the total $P$ digits of this answer,
+only the first $k$ decimal digits are correct, where
+$k =  - \frac{\ln 3 n \epsilon }{\ln 10} $. In other words, we have lost
+$$P - k = \frac{\ln 3 n}{\ln 10} $$
+digits because of accumulated round-off error. So we found that we need
+$\frac{\ln 3 n}{\ln 10} $ extra decimal digits to compensate for this
+round-off error.
+
+
+<p>
+This estimate assumes several things about the series (basically, that the series is "well-behaved").
+These assumptions must be verified in each particular case.
+For example, if the series begins with some large
+terms but converges to a very small value, this estimate is wrong (see the next
+subsection).
+
+
+<p>
+In the previous exercise we found the number of terms $n$ for $\exp \left( x\right) $. So now we know how many extra digits of working precision we need for this particular case.
+
+
+<p>
+Below we shall have to perform similar estimates of the required number
+of terms and of the accumulated round-off error in our analysis of the
+algorithms.
+
+
+<p>
+
+<h3>
+<hr>Catastrophic round-off error
+</h3>
+<a name="arbitrary-precision computation!catastrophic round-off error">
+
+</a>
+Sometimes the round-off error of a particular method of computation becomes so large that the method becomes highly inefficient.
+
+
+<p>
+Consider the computation of $\sin x$ by the truncated Taylor series
+$$\sin x\approx \sum _{k = 0} ^{N - 1} \left(  - 1\right)  ^{k} \frac{x ^{2 k + 1}}{\left( 2 k + 1\right) !} ,$$
+when $x$ is large.
+We know that this series converges for all $x$, no matter how large.
+Assume that $x = 10 ^{M}$ with $M\geq 1$, and that we need $P$ decimal digits of precision in the result.
+
+
+<p>
+First, we determine the necessary number of terms $N$.
+The magnitude of the sum is never larger than $1$.
+Therefore we need the $N$-th term of the series to be smaller than $10 ^{ - P}$.
+The inequality is
+$\left( 2 N + 1\right) ! &gt; 10 ^{P + M \left( 2 N + 1\right) }$.
+We obtain that $2 N + 2 &gt; e\cdot 10 ^{M}$ is a necessary condition, and if $P$ is large, we find approximately
+$$2 N + 2\approx \frac{\left( P - M\right)  \ln 10}{\ln \left( P - M\right)  - 1 - M \ln 10} .$$
+
+
+<p>
+However, taking enough terms does not yet guarantee a good result.
+The terms of the series grow at first and then start to decrease.
+The sum of these terms is, however, small.
+Therefore there is some cancellation and we need to increase the working precision to avoid the round-off.
+Let us estimate the required working precision.
+
+
+<p>
+We need to find the magnitude of the largest term of the series.
+The ratio of the next term to the previous term is $\frac{x}{2 k \left( 2 k + 1\right) } $ and therefore the maximum will be when this ratio becomes equal to $1$, i.e. for $2 k\approx \sqrt{x}$.
+Therefore the largest term is of order $\frac{x ^{\sqrt{x}}}{\sqrt{x}!} $ and so we need about $\frac{M}{2}  \sqrt{x}$ decimal digits before the decimal point to represent this term.
+But we also need to keep at least $P$ digits after the decimal point, or else the round-off error will erase the significant digits of the result.
+In addition, we will have unavoidable round-off error due to $O\left( P\right) $ arithmetic operations.
+So we should increase precision again by $P + \frac{\ln P}{\ln 10} $ digits plus a few guard digits.
+
+
+<p>
+As an example, to compute $\sin 10$ to $P = 50$ decimal digits with this method, we need a working precision of about $60$ digits, while to compute $\sin 10000$ we need to work with about $260$ digits.
+This shows how inefficient the Taylor series for $\sin x$ becomes for large arguments $x$.
+A simple transformation $x = 2 \pi  n + x'$ would have reduced $x$ to at most 7, and the unnecessary computations with $260$ digits would be avoided.
+The main cause of this inefficiency is that we have to add and subtract extremely large numbers to get a relatively small result of order $1$.
+
+
+<p>
+We find that the method of Taylor series for $\sin x$ at large $x$ is highly inefficient because of round-off error and should be complemented by other methods.
+This situation seems to be typical for Taylor series.
+
+
+<p>
+
+<a name="c4s7">
+
+</a>
+<h2>
+<hr>4.7 Basic arbitrary-precision arithmetic 
+</h2>
+<a name="arbitrary-precision computation!Yacas internal math">
+
+</a>
+Yacas uses an internal math library (the <b><tt>yacasnumbers</tt></b> library) which comes with the source
+code. This reduces the dependencies of the Yacas system and improves portability.
+The internal math library is simple and does not necessarily use the most optimal algorithms.
+
+
+<p>
+If $P$ is
+the number of digits of precision, then multiplication and division take
+$M\left( P\right)  = O\left( P ^{2}\right) $ operations in the internal math. (Of course, multiplication and division by a short integer takes time linear in $P$.)
+Much faster algorithms (Karatsuba, Toom-Cook, FFT multiplication, Newton-Raphson division etc.) are
+implemented in <b><tt>gmp</tt></b>, <b><tt>CLN</tt></b> and some other libraries.
+The asymptotic cost of multiplication for very large precision is $M\left( P\right) \approx O\left( P ^{1.6}\right) $ for the Karatsuba method and $M\left( P\right)  = O\left( P \ln P \ln \ln P\right) $ for the FFT method.
+In the estimates of computation cost in this book we shall assume that $M\left( P\right) $ is at
+least linear in $P$ and maybe a bit slower.
+
+
+<p>
+The costs of multiplication may be different in various arbitrary-precision arithmetic libraries and on different computer platforms.
+As a rough guide, one can assume that the straightforward $O\left( P ^{2}\right) $ multiplication is good until 100-200 decimal digits,
+the asymptotically fastest method of FFT multiplication is good at the precision of about 5,000 or more decimal digits,
+and the Karatsuba multiplication is best in the middle range.
+
+
+<p>
+Warning: calculations with internal Yacas math using precision exceeding 10,000 digits are currently impractically slow.
+
+
+<p>
+
+<a name="continued fraction approximation!estimating $\ln 2$">
+
+</a>
+In some algorithms it is necessary to compute the integer parts of expressions such as $a \frac{\ln b}{\ln 10} $ or $a \frac{\ln 10}{\ln 2} $, where $a$, $b$ are short integers of order $O\left( P\right) $. Such expressions are frequently needed to estimate the number of terms in the Taylor series or similar parameters of the algorithms. In these cases, it is important that the result is not underestimated. However, it would be wasteful to compute $1000 \frac{\ln 10}{\ln 2} $ in great precision only to discard most of that information by taking the integer part of that number.
+It is more efficient to approximate such constants from above by short rational numbers, for example, $\frac{\ln 10}{\ln 2}  &lt; \frac{28738}{8651} $ and $\ln 2 &lt; \frac{7050}{10171} $. The error of such an approximation will be small enough for practical purposes. The function <b><tt>BracketRational</tt></b> can be used to find optimal rational approximations.
+
+
+<p>
+The function <b><tt>IntLog</tt></b> (see below) efficiently computes the integer part of a logarithm (for an integer base, not a natural logarithm). If more precision is desired in calculating $\frac{\ln a}{\ln b} $ for integer $a$, $b$, one can compute $\mathrm{ IntLog }\left( a ^{k}, b\right) $ for some integer $k$ and then divide by $k$.
+
+
+<p>
+
+<a name="c4s8">
+
+</a>
+<h2>
+<hr>4.8 How many digits of $\sin \exp \left( \exp \left( 1000\right) \right) $ do we need?
+</h2>
+<a name="arbitrary-precision computation!very large numbers">
+
+</a>
+Arbitrary-precision math is not omnipotent against overflow.
+Consider the problem of representing very large numbers such as $x = \exp \left( \exp \left( 1000\right) \right) $.
+Suppose we need a floating-point representation of the number $x$ with $P$ decimal digits of precision.
+In other words, we need to express
+$x\approx M\cdot 10 ^{E}$,
+where the mantissa $1 &lt; M &lt; 10$ is a floating-point number and the exponent
+$E$ is an integer, chosen so that the relative precision is $10 ^{ - P}$.
+How much effort is needed to find $M$ and $E$?
+
+
+<p>
+The exponent $E$ is easy to obtain:
+$$E = \left\lfloor \frac{\ln x}{\ln 10} \right\rfloor  = \left\lfloor \frac{\exp \left( 1000\right) }{\ln 10} \right\rfloor \approx 8.55\cdot 10 ^{433}.$$
+To compute the integer part $\left\lfloor y\right\rfloor $ of a number $y$ exactly, we need to approximate $y$ with at least $\frac{\ln y}{\ln 10} $ floating-point digits.
+In our example, we find that we need 434 decimal digits to represent $E$.
+
+
+<p>
+Once we found $E$, we can write $x = 10 ^{E + m}$ where $m = \frac{\exp \left( 1000\right) }{\ln 10}  - E$ is a floating-point number, $0 &lt; m &lt; 1$.
+Then $M = 10 ^{m}$.
+To find $M$ with $P$ (decimal) digits, we need $m$ with also at least $P$ digits.
+Therefore, we actually need to evaluate $\frac{\exp \left( 1000\right) }{\ln 10} $ with $434 + P$ decimal digits before we can find $P$ digits of the mantissa of $x$.
+We ran into a perhaps surprising situation: one needs a high-precision calculation even to find the first digit of $x$, because it is necessary to find the exponent $E$ exactly as an integer, and $E$ is a rather large integer.
+A normal double-precision numerical calculation would give an overflow error at this point.
+
+
+<p>
+Suppose we have found the number $x = \exp \left( \exp \left( 1000\right) \right) $ with some precision.
+What about finding $\sin x$?
+Now, this is extremely difficult, because to find even the first digit of $\sin x$ we have to evaluate $x$ with <i>absolute</i> error of at most $0.5$.
+We know, however, that the number $x$ has approximately $10 ^{434}$ digits <i>before</i> the decimal point.
+Therefore, we would need to calculate $x$ with at least that many digits.
+Computations with $10 ^{434}$ digits is clearly far beyond the capability of modern computers.
+It seems unlikely that even the sign of $\sin \exp \left( \exp \left( 1000\right) \right) $ will be obtained in the near future.
+<h6>It seems even less likely that the sign of $\sin \exp \left( \exp \left( 1000\right) \right) $ would be of any use to anybody even if it could be computed.</h6>
+
+<p>
+Suppose that $N$ is the largest integer that our arbitrary-precision facility can reasonably handle.
+(For Yacas internal math library, $N$ is about $10 ^{10000}$.)
+Then it follows that numbers $x$ of order $10 ^{N}$ can be calculated with at most one (1) digit of floating-point precision,
+while larger numbers cannot be calculated with any precision at all.
+
+
+<p>
+It seems that very large numbers can be obtained in practice only through exponentiation or powers.
+It is unlikely that such numbers will arise from sums or products of reasonably-sized numbers in some formula.
+<h6>A factorial function can produce rapidly growing results, but exact factorials $n!$ for large $n$ are well represented by the Stirling formula which involves powers and exponentials.</h6>For example, suppose a program operates with numbers $x$ of size $N$ or smaller;
+a number such as $10 ^{N}$ can be obtained only by multiplying $O\left( N\right) $ numbers $x$ together.
+But since $N$ is the largest representable number, it is certainly not feasible to perform $O\left( N\right) $ sequential operations on a computer.
+However, it is feasible to obtain $N$-th power of a small number, since it requires only $O\left( \ln N\right) $ operations.
+
+
+<p>
+
+<a name="exponentially large numbers">
+
+</a>
+If numbers larger than $10 ^{N}$  are created only by exponentiation operations, then special exponential notation could be used to represent them.
+For example, a very large number $z$ could be stored and manipulated as an unevaluated exponential $z = \exp \left( M\cdot 10 ^{E}\right) $ where $M\geq 1$ is a floating-point number with $P$ digits of mantissa and $E$ is an integer, $\ln N &lt; E &lt; N$.
+Let us call such objects "exponentially large numbers" or "exp-numbers" for short.
+
+
+<p>
+In practice, we should decide on a threshold value $N$ and promote a number to an exp-number when its logarithm exceeds $N$.
+
+
+<p>
+Note that an exp-number $z$ might be positive or negative, e.g.
+$z =  - \exp \left( M\cdot 10 ^{E}\right) $.
+
+
+<p>
+Arithmetic operations can be applied to the exp-numbers.
+However, exp-large arithmetic is of limited use because of an almost certainly critical loss of precision.
+The power and logarithm operations can be meaningfully performed on exp-numbers $z$.
+For example, if $z = \exp \left( M\cdot 10 ^{E}\right) $ and $p$ is a normal floating-point number, then $z ^{p} = \exp \left( p M\cdot 10 ^{E}\right) $ and $\ln z = M\cdot 10 ^{E}$.
+We can also multiply or divide two exp-numbers.
+But it makes no sense to multiply an exp-number $z$ by a normal number because we cannot represent the difference between $z$ and say $2.52 z$.
+Similarly, adding $z$ to anything else would result in a total underflow, since we do not actually know a single digit of the decimal representation of $z$.
+So if $z_{1}$ and $z_{2}$ are exp-numbers, then $z_{1} + z_{2}$ is simply equal to either $z_{1}$ or $z_{2}$ depending on which of them is larger.
+
+
+<p>
+We find that an exp-number $z$ acts as an effective "infinity" compared with normal numbers.
+But exp-numbers cannot be used as a device for computing limits: the unavoidable underflow will almost certainly produce wrong results.
+For example, trying to verify 
+$$\lim _{x\rightarrow 0} \frac{\exp \left( x\right)  - 1}{x}  = 1$$
+by substituting $x = \frac{1}{z} $ with some exp-number $z$ gives 0 instead of 1.
+
+
+<p>
+Taking a logarithm of an exp-number brings it back to the realm of normal, representable numbers.
+However, taking an exponential of an exp-number results in a number which is not representable even as an exp-number.
+This is because an exp-number $z$ needs to have its exponent $E$ represented exactly as an integer,
+but $\exp \left( z\right) $ has an exponent of order $O\left( z\right) $ which is not a representable number.
+The monstrous number $\exp \left( z\right) $ could be only written as $\exp \left( \exp \left( M\cdot 10 ^{E}\right) \right) $, i.e. as a "doubly exponentially large" number, or "2-exp-number" for short.
+Thus we obtain a hierarchy of iterated exp-numbers.
+Each layer is "unrepresentably larger" than the previous one.
+
+
+<p>
+
+<a name="arbitrary-precision computation!very small numbers">
+
+</a>
+<a name="exponentially small numbers">
+
+</a>
+The same considerations apply to very small numbers of the order $10 ^{ - N}$ or smaller.
+Such numbers can be manipulated as "exponentially small numbers", i.e. expressions of the form $\exp \left(  - M\cdot 10 ^{E}\right) $ with floating-point mantissa $M\geq 1$ and integer $E$ satisfying $\ln N &lt; E &lt; N$.
+Exponentially small numbers act as an effective zero compared with normal numbers.
+
+
+<p>
+Taking a logarithm of an exp-small number makes it again a normal representable number.
+However, taking an exponential of an exp-small number produces 1 because of underflow.
+To obtain a "doubly exponentially small" number, we need to take a reciprocal of a doubly exponentially large number, or take the exponent of an exponentially large negative power.
+In other words, $\exp \left(  - M\cdot 10 ^{E}\right) $ is exp-small, while $\exp \left(  - \exp \left( M\cdot 10 ^{E}\right) \right) $ is 2-exp-small.
+
+
+<p>
+The practical significance of exp-numbers is rather limited. 
+We cannot obtain even a single significant digit of an exp-number.
+A "computation" with exp-numbers is essentially a floating-point computation with logarithms of these exp-numbers.
+A practical problem that needs numbers of this magnitude can probably be restated in terms of more manageable logarithms of such numbers.
+In practice, exp-numbers could be useful not as a means to get a numerical answer,
+but as a warning sign of critical overflow or underflow.
+<h6>Yacas currently does not implement exp-numbers or any other guards against overflow and underflow. If a decimal exponential becomes too large, an incorrect answer may result.</h6>
+<a name="c4s9">
+
+</a>
+<h2>
+<hr>4.9 Continued fractions
+</h2>
+A "continued fraction" is an expression of the form
+$$a _{0} + \frac{b _{0}}{a _{1} + \frac{b _{1}}{a _{2} + \frac{b _{2}}{a _{3} + \mathrm{ ... }} } } .$$
+The coefficients $a _{i}$, $b _{i}$ are called the "terms" of the fraction.
+(Usually one has $a _{i}\neq 0$, $b _{i}\neq 0$.)
+The above continued fraction is sometimes written as
+$$a _{0} + \frac{b _{0}}{a _{1} + \mathrm{ ... }}  \frac{b _{1}}{a _{2} + \mathrm{ ... }}  \frac{b _{2}}{a _{3} + \mathrm{ ... }}  \mathrm{ ... }$$
+
+
+<p>
+Usually one considers infinite continued fractions, i.e. the sequences $a _{i}$, $b _{i}$ are infinite.
+The value of an infinite continued fraction is defined as the limit of the fraction truncated after a very large number of terms.
+(A continued traction can be truncated after $n$-th term if one replaces $b _{n}$ by $0$.)
+
+
+<p>
+An infinite continued fraction does not always converge.
+Convergence depends on the values of the terms.
+
+
+<p>
+The representation of a number via a continued fraction is not unique because we could, for example, multiply the numerator and the denominator of any simple fraction inside it by any number.
+Therefore one may consider some normalized representations.
+A continued fraction is called "regular" if $b _{k} = 1$ for all $k$, all $a _{k}$ are integer and $a _{k} &gt; 0$ for $k\geq 1$.
+Regular continued fractions always converge.
+
+
+<p>
+
+<h3>
+<hr>Approximation of numbers by continued fractions
+</h3>
+<a name="continued fraction approximation!of rational numbers">
+
+</a>
+The function <b><tt>ContFrac</tt></b> converts a (real) number $r$ into a regular
+continued fraction with integer terms,
+$$r = n _{0} + \frac{1}{n _{1} + \frac{1}{n _{2} + \mathrm{ ... }} } .$$
+Here all numbers $n _{i}$ are integers and all except $n _{0}$ are positive.
+This representation of a real number $r$ is unique.
+We may write this representation as $r =  \left( n _{0}, n _{1}, n _{2}, \mathrm{ ... }\right) $.
+If $r$ is a rational number, the corresponding regular continued fraction is finite, terminating at some $n _{N}$.
+Otherwise the continued fraction will be infinite.
+It is known that the truncated fractions will be in some sense "optimal" rational representations of the real number $r$.
+
+
+<p>
+The algorithm for converting a rational number $r = \frac{n}{m} $ into a regular continued
+fraction is simple. First, we determine the integer part of $r$, which is
+$\mathrm{ Div }\left( n, m\right) $. If it is negative, we need to subtract one, so that $r = n _{0} + x$ and
+the remainder $x$ is nonnegative and less than $1$. The remainder
+$x = \frac{n\bmod m}{m} $ is then inverted, $r _{1}\equiv \frac{1}{x}  = \frac{m}{n\bmod m} $ and so we have
+completed the first step in the decomposition, $r = n _{0} + \frac{1}{r _{1}} $; now $n _{0}$
+is integer but $r _{1}$ is perhaps not integer. We repeat the same procedure on
+$r _{1}$, obtain the next integer term $n _{1}$ and the remainder $r _{2}$ and so on,
+until such $n$ that $r _{n}$ is an integer and there is no more work to do. This
+process will always terminate.
+
+
+<p>
+If $r$ is a real number which is known by its floating-point representation at some precision, then we can use the same algorithm because all floating-point values are actually
+rational numbers.
+
+
+<p>
+Real numbers known by their exact representations can sometimes be expressed as infinite continued fractions, for example
+$$\sqrt{11} =  \left( 3, 3, 6, 3, 6, 3, 6, \mathrm{ ... }\right) ;$$
+$$\exp \left( \frac{1}{p} \right)  =  \left( 1, p - 1, 1, 1, 3 p - 1, 1, 1, 5 p - 1, \mathrm{ ... }\right) .$$
+
+
+<p>
+
+<a name="GuessRational@\relax <b><tt>GuessRational</tt></b>">
+
+</a>
+The functions <b><tt>GuessRational</tt></b> and <b><tt>NearRational</tt></b> take a real number $x$ and use
+continued fractions to find rational approximations $r = \frac{p}{q} \approx x$ with "optimal" (small) numerators and denominators $p$, $q$.
+
+
+<p>
+Suppose we know that a
+certain number $x$ is rational but we have only a floating-point representation of
+$x$ with a limited precision, for example, $x\approx 1.5662650602409638$.
+We would like to guess a
+rational form for $x$ (in this example $x = \frac{130}{83} $).
+The function <b><tt>GuessRational</tt></b> solves this problem.
+
+
+<p>
+Consider the following example. The number $\frac{17}{3} $ has a continued fraction
+expansion <b><tt>{5,1,2}</tt></b>. Evaluated as a floating point number with limited
+precision, it may become something like $\frac{17}{3}  + 0.00001$, where the small number
+represents a round-off error. The continued fraction expansion of this number is
+<b><tt>{5, 1, 2, 11110, 1, 5, 1, 3, 2777, 2}</tt></b>. The presence of an unnaturally large
+term $11110$ clearly signifies the place where the floating-point error was
+introduced; all terms following it should be discarded to recover the continued fraction <b><tt>{5,1,2}</tt></b> and from it the initial number $\frac{17}{3} $.
+
+
+<p>
+If a continued fraction for a number $x$ is
+cut right before an unusually large term and
+evaluated, the resulting rational number has a small denominator and is very close to $x$.
+This works because partial continued fractions provide "optimal"
+rational approximations for the final (irrational) number, and because the
+magnitude of the terms of the partial fraction is related to the magnitude of
+the denominator of the resulting rational approximation.
+
+
+<p>
+<b><tt>GuessRational(x, prec)</tt></b> needs to choose the place where it should cut the
+continued fraction.
+The algorithm for this is somewhat heuristic but it works well enough.
+The idea is to cut the continued fraction
+when adding one more term would change the result by less than the specified
+precision. To realize this in practice, we need an estimate of how much a
+continued fraction changes when we add one term.
+
+
+<p>
+
+<a name="continued fraction approximation!error bound">
+
+</a>
+The routine <b><tt>GuessRational</tt></b> uses a (somewhat weak) upper bound for the difference of continued fractions that differ only by an additional last term:
+$$\left| \delta \right| \equiv \left| \frac{1}{a _{1} + \frac{1}{\mathrm{ ... } + \frac{1}{a _{n}} } }  - \frac{1}{a _{1} + \frac{1}{\mathrm{ ... } + \frac{1}{a _{n + 1}} } } \right|  &lt; \frac{1}{\left( a _{1} \mathrm{ ... } a _{n}\right)  ^{2} a _{n + 1}} .$$
+(The derivation of this inequality is given below.)
+Thus we should compute the product of successive terms $a _{i}$ of the continued fraction and stop at $a _{n}$ at which this product exceeds the maximum number of digits. The routine <b><tt>GuessRational</tt></b> has a second parameter <b><tt>prec</tt></b> which is by default 1/2 times the number of decimal digits of current precision; it stops at $a _{n}$ at which the product $a _{1} \mathrm{ ... } a _{n}$ exceeds $10 ^{\mathrm{ prec }}$.
+
+
+<p>
+The above estimate for $\delta $ hinges on the inequality
+$$\frac{1}{a + \frac{1}{b + \mathrm{ ... }} }  &lt; \frac{1}{a} $$
+and is suboptimal if some terms $a _{i} = 1$, because the product of $a _{i}$ does not increase when one of the terms is equal to 1, whereas in fact these terms do make $\delta $ smaller. A somewhat better estimate would be obtained if we use the inequality
+$$\frac{1}{a + \frac{1}{b + \frac{1}{c + \mathrm{ ... }} } }  &lt; \frac{1}{a + \frac{1}{b + \frac{1}{c} } } .$$
+(See the next section for more explanations of precision of continued fraction approximations.)
+This does not lead to a significant improvement if $a &gt; 1$ but makes a difference when $a = 1$. In the product $a _{1} \mathrm{ ... } a _{n}$, the terms $a _{i}$ which are equal to 1 should be replaced by
+$$a _{i} + \frac{1}{a _{i + 1} + \frac{1}{a _{i + 2}} } .$$
+Since the comparison of $a _{1} \mathrm{ ... } a _{n}$ with $10 ^{\mathrm{ prec }}$ is qualitative, it it enough to perform calculations of $a _{1} \mathrm{ ... } a _{n}$ with limited precision.
+
+
+<p>
+This algorithm works well if $x$ is computed with enough precision; namely, it
+must be computed to at least as many digits as there are in the numerator and
+the denominator of the fraction combined. Also, the parameter <b><tt>prec</tt></b> should not
+be too large (or else the algorithm will find another rational number with a larger
+denominator that approximates $x$ "better" than the precision to which you know $x$).
+
+
+<p>
+
+<a name="NearRational@\relax <b><tt>NearRational</tt></b>">
+
+</a>
+The related function <b><tt>NearRational(x, prec)</tt></b> works somewhat differently. The
+goal is to find an "optimal" rational number, i.e. with smallest numerator and
+denominator, that is within the distance $10 ^{ - \mathrm{ prec }}$ of a given value $x$.
+The function <b><tt>NearRational</tt></b> does not always give the same answer as <b><tt>GuessRational</tt></b>.
+
+
+<p>
+The
+algorithm for <b><tt>NearRational</tt></b> comes from the HAKMEM [Beeler <i>et al.</i> 1972], Item 101C. Their
+description is terse but clear:
+
+
+<p>
+<table cellpadding="0" width="100%">
+<tr><td width=100% bgcolor="#DDDDEE"><pre>
+Problem: Given an interval, find in it the
+rational number with the smallest numerator and
+denominator.
+Solution: Express the endpoints as continued
+fractions.  Find the first term where they differ
+and add 1 to the lesser term, unless it's last. 
+Discard the terms to the right.  What's left is
+the continued fraction for the "smallest"
+rational in the interval.  (If one fraction
+terminates but matches the other as far as it
+goes, append an infinity and proceed as above.)
+</pre></tr>
+</table>
+
+
+<p>
+The HAKMEM text [Beeler <i>et al.</i> 1972] contains several interesting insights relevant to continued fractions and other numerical algorithms.
+
+
+<p>
+
+<h3>
+<hr>Accurate computation of continued fractions
+</h3>
+Sometimes an analytic function $f\left( x\right) $ can be approximated using a continued
+fraction that contains $x$ in its terms. Examples include the inverse tangent
+$\arctan x$, the error function $\mathrm{erf}\, x$, and the incomplete gamma function
+$\Gamma \left( a, x\right) $ (see below for details).
+For these functions, continued fractions
+provide a method of numerical calculation that works when the Taylor series
+converges slowly or not at all, or is not easily available.
+However, continued fractions may converge
+quickly for one value of $x$ but slowly for another.
+Also, it is not as easy to
+obtain an analytic error bound for a continued fraction approximation as it is for power series.
+
+
+<p>
+In this section we describe some methods for computing general continued fractions and for estimating the number of terms needed to achieve a given precision.
+
+
+<p>
+Let us introduce some notation. A continued fraction
+$$a _{0} + \frac{b _{0}}{a _{1} + \frac{b _{1}}{a _{2} + \mathrm{ ... }} } $$
+is specified by a set of terms ($a _{i}$, $b _{i}$).
+[If continued fractions are used to approximate analytic functions such as $\arctan x$, then ($a _{i}$, $b _{i}$) will depend on $x$.]
+Let us denote by $F _{\left( m, n\right) }$ the truncated fraction containing only the terms from $m$ to $n$,
+$$F _{\left( m, n\right) }\equiv a _{m} + \frac{b _{m}}{a _{m + 1} + \frac{b _{m + 1}}{\mathrm{ ... } + \frac{b _{n}}{a _{n}} } } .$$
+In this notation, the continued fraction that we need to compute is $F _{\left( 0, n\right) }$.
+Our task is first, to select a large enough $n$ so that $F _{\left( 0, n\right) }$ gives enough precision, and second, to compute that value.
+
+
+<p>
+
+<h3>
+<hr>Method 1: bottom-up with straightforward division
+</h3>
+<a name="continued fraction approximation!bottom-up computation">
+
+</a>
+All "bottom-up" methods need to know the number of terms $n$ in advance.
+The simplest method is to start evaluating the fraction from the bottom upwards.
+As the initial approximation we take $F _{\left( n, n\right) } = a _{n}$.
+Then we use the obvious relation of backward recurrence,
+$$F _{\left( m, n\right) } = a _{m} + \frac{b _{m}}{F _{\left( m + 1, n\right) }} ,$$
+to obtain successively $F _{\left( n - 1, n\right) }$, ..., $F _{\left( 0, n\right) }$.
+
+
+<p>
+This method requires one long division at each step.
+There may be significant round-off error if $a _{m}$ and $b _{m}$ have opposite signs, but otherwise the round-off error is very small because a convergent continued fraction is not sensitive to small changes in its terms.
+
+
+<p>
+
+<h3>
+<hr>Method 2: bottom-up with two recurrences
+</h3>
+An alternative implementation may be faster in some cases.
+The idea is to obtain the numerator and the denominator of $F _{\left( 0, n\right) }$
+separately as two simultaneous backward recurrences. If 
+$F _{\left( m + 1, n\right) } = \frac{p _{m + 1}}{q _{m + 1}} $, then 
+$p _{m} = a _{m} p _{m + 1} + b _{m} q _{m + 1}$ and $q _{m} = p _{m + 1}$.
+The recurrences start with
+$p _{n} = a _{n}$, $q _{n} = 1$.
+The method requires two long multiplications at each step; the only
+division will be performed at the very end.
+Sometimes this method reduces the round-off error as well.
+
+
+<p>
+
+<h3>
+<hr>Method 3: bottom-up with estimated remainders
+</h3>
+<a name="continued fraction approximation!bottom-up computation!estimated remainder">
+
+</a>
+There is an improvement over the bottom-up method that can sometimes increase the achieved
+precision without computing more terms.
+This trick is suggested in [Tsimring 1988], sec. 2.4, where it is also claimed that the remainder estimates improve convergence.
+
+
+<p>
+The idea is that the starting value of the backward recurrence should be chosen not as
+$a _{n}$ but as another number that more closely approximates the infinite remainder of the fraction.
+The infinite remainder, which we can symbolically write as $F _{\left( n, \infty \right) }$, can be sometimes estimated analytically (obviously, we are unable to compute the remainder exactly).
+In simple cases, $F _{\left( n, \infty \right) }$ changes very slowly at large $n$
+(warning: this is not always true and needs to be verified in each particular case!).
+Suppose that $F _{\left( n, \infty \right) }$ is approximately constant; then it must be approximately equal to $F _{\left( n + 1, \infty \right) }$.
+Therefore, if we solve the (quadratic) equation
+$$x = a _{n} + \frac{b _{n}}{x} ,$$
+we shall obtain the (positive) value $x$ which may be a much better
+approximation for $F _{\left( n, \infty \right) }$ than $a _{n}$. But this depends on the
+assumption of the way the continued fraction converges. It may happen,
+for example, that for large $n$ the value $F _{\left( n, \infty \right) }$ is almost
+the same as $F _{\left( n + 2, \infty \right) }$ but is significantly different from
+$F _{\left( n + 1, \infty \right) }$. Then we should instead solve the (quadratic) equation
+$$x = a _{n} + \frac{b _{n}}{a _{n + 1} + \frac{b _{n + 1}}{x} } $$
+and take the positive solution $x$ as $F _{\left( n, \infty \right) }$.
+
+
+<p>
+We may use more terms of the original continued fraction starting from $a _{n}$ and obtain a more precise estimate of the remainder.
+In each case we will only have to solve one quadratic equation.
+
+
+<p>
+
+<h3>
+<hr>Method 4: top-down computation
+</h3>
+The "bottom-up" method obviously requires to know the number of terms $n$ in
+advance; calculations have to be started all over again if more terms are
+needed. Also, the bottom-up method provides no error estimate.
+
+
+<p>
+
+<a name="continued fraction approximation!top-down computation">
+
+</a>
+The "top-down" method is slower but provides an automatic error estimate and can be used to
+evaluate a continued fraction with more and more terms until the desired
+precision is achieved.
+The idea
+<h6>This is a well-known result in the theory of continued fractions. We give an elementary derivation below.</h6>is to
+replace the continued fraction $F _{\left( 0, n\right) }$ with a sum of a certain series,
+$$a _{0} + \frac{b _{0}}{a _{1} + \frac{b _{1}}{\mathrm{ ... } + \frac{b _{n - 1}}{a _{n}} } }  = \sum _{k = 0} ^{n} f _{k}.$$
+Here
+$$f _{k}\equiv F _{\left( 0, k\right) } - F _{\left( 0, k - 1\right) }$$
+($k\geq 1$) is a sequence that will be calculated in the forward direction, starting from $k = 1$.
+If we manage to find a formula for this sequence, then adding one
+more term $f _{k}$ will be equivalent to recalculating the
+continued fraction with $k$ terms instead of $k - 1$ terms. This will
+automatically give an error estimate and allow to compute with more
+precision if necessary without having to repeat the calculation from
+the beginning. (The transformation of the continued fraction into a
+series is exact, not merely an approximation.)
+
+
+<p>
+The formula for $f _{k}$ is the following.
+First the auxiliary sequence $P _{k}$, $Q _{k}$ for $k\geq 1$ needs to be
+defined by $P _{1} = 0$, $Q _{1}$=1, and $P _{k + 1}\equiv b _{k} Q _{k}$,
+$Q _{k + 1}\equiv P _{k} + a _{k} Q _{k}$.
+Then define $f _{0}\equiv a _{0}$ and 
+$$f _{k}\equiv \frac{\left(  - 1\right)  ^{k} b _{0} \mathrm{ ... } b _{k - 1}}{Q _{k} Q _{k + 1}} $$
+for $k\geq 1$.
+The "top-down" method consists of computing $f _{n}$
+sequentially and adding them together, until $n$ is large enough so
+that $\frac{f _{n}}{f _{0}} $ is less than the required precision.
+
+
+<p>
+Evaluating the next element $f _{k}$ requires four long multiplications
+and one division.
+This is significantly slower, compared with just one long division or two long multiplications in the bottom-up method.
+Therefore it is desirable to have an a priori estimate of the convergence rate and to be able to choose the number of terms before the computation.
+Below we shall consider some examples when the formula for $f _{k}$ allows to estimate the required number of terms analytically.
+
+
+<p>
+
+<h3>
+<hr>Method 5: top-down with two steps at once
+</h3>
+<a name="continued fraction approximation!top-down computation!non-alternating signs">
+
+</a>
+If all coefficients $a _{i}$, $b _{i}$ are positive, then the
+series we obtained in the top-down method will have terms $f _{k}$ with alternating signs.
+This leads to a somewhat larger round-off error.
+We can convert the alternating series into a monotonic series
+by adding together two adjacent elements, say
+$f _{2 k} + f _{2 k + 1}$.
+<h6>This method is used by [Thacher 1963], who refers to a suggestion by Hans Maehly.</h6>The relevant formulae can be derived from the
+definition of $f _{k}$ using the recurrence relations for $P _{k}$, $Q _{k}$:
+$$f _{2 k - 1} + f _{2 k} =  - \frac{b _{0} \mathrm{ ... } b _{2 k - 2} a _{2 k}}{Q _{2 k - 1} Q _{2 k + 1}} ,$$
+$$f _{2 k} + f _{2 k + 1} = \frac{b _{0} \mathrm{ ... } b _{2 k - 1} a _{2 k + 1}}{Q _{2 k} Q _{2 k + 2}} .$$
+Now in the series $f _{0}$+($f _{1} + f _{2}$)+($f _{3} + f _{4}$)+... the first term is positive and all subsequent terms will be negative.
+
+
+<p>
+
+<h3>
+<hr>Which method to use
+</h3>
+We have just described the following methods of computing a continued fraction:
+<ul><li>Bottom-up, straight division.
+</li><li>Bottom-up, separate recurrences for numerators and denominators.
+</li><li>Bottom-up, with an estimate of the remainder.
+</li><li>Top-down, with ordinary step.
+</li><li>Top-down, with two steps at once.
+</li></ul>
+
+<p>
+The bottom-up methods are simpler and faster than the top-down methods but require to know the number of terms in advance.
+In many cases the required number of terms can be estimated analytically, and then the bottom-up methods are always preferable.
+But in some cases the convergence analysis is very complicated.
+
+
+<p>
+The plain bottom-up method requires one long division at each step, while the bottom-up method with two recurrences requires two long multiplications at each step.
+Since the time needed for a long division is usually about four times that for a long multiplication (e.g. when the division is computed by Newton's method), the second variation of the bottom-up method is normally faster.
+
+
+<p>
+The estimate of the remainder improves the convergence of the bottom-up method and should always be used if available.
+
+
+<p>
+If an estimate of the number of terms is not possible, the top-down methods should be used, looping until the running error estimate shows enough precision.
+This incurs a performance penalty of at least 100<b><tt>%</tt></b> and at most 300<b><tt>%</tt></b>.
+The top-down method with two steps at once should be used only when the formula for $f _{k}$ results in alternating signs.
+
+
+<p>
+
+<h3>
+<hr>Usefulness of continued fractions
+</h3>
+Many mathematical functions have a representation as a continued fraction.
+Some systems of "exact arithmetic" use continued fractions as a primary internal representation of real numbers.
+This has its advantages (no round-off errors, lazy "exact" computations) and disadvantages (it is slow, especially with some operations).
+Here we consider the use of continued fractions with a traditional implementation of arithmetic (floating-point numbers with variable precision).
+
+
+<p>
+Usually, a continued fraction representation of a function will converge geometrically or slower, i.e. at least $O\left( P\right) $ terms are needed for a precision of $P$ digits.
+If a geometrically convergent Taylor series representation is also available, the continued fraction method will be slower because it requires at least as many or more long multiplications per term.
+Also, in most cases the Taylor series can be computed much more efficiently using the rectangular scheme.
+(See, e.g., the section on $\arctan x$ for a more detailed consideration.)
+
+
+<p>
+However, there are some functions for which a Taylor series is not easily computable or does not converge but a continued fraction is available.
+For example, the incomplete Gamma function and related functions can be computed using continued fractions in some domains of their arguments.
+
+
+<p>
+
+<h3>
+<hr>Derivation of the formula for $f _{k}$
+</h3>
+<a name="continued fraction approximation!top-down computation!derivation">
+
+</a>
+Here is a straightforward derivation of the formula for $f _{k}$ in the top-down method.
+We need
+to compute the difference between successive approximations $F _{\left( 0, n\right) }$
+and $F _{\left( 0, n + 1\right) }$.
+The recurrence relation we shall use is
+$$F _{\left( m, n + 1\right) } - F _{\left( m, n\right) } =  - \frac{b _{m} \left( F _{\left( m + 1, n + 1\right) } - F _{\left( m + 1, n\right) }\right) }{F _{\left( m + 1, n + 1\right) } F _{\left( m + 1, n\right) }} .$$
+This can be shown by manipulating the two fractions, or by using
+the recurrence relation for $F _{\left( m, n\right) }$.
+
+
+<p>
+So far we have reduced the difference between $F _{\left( m, n + 1\right) }$ and $F _{\left( m, n\right) }$
+to a similar difference on the next level $m + 1$ instead of $m$; i.e. we
+can increment $m$ but keep $n$ fixed. We can apply this formula to
+$F _{\left( 0, n + 1\right) } - F _{\left( 0, n\right) }$, i.e. for $m = 0$, and continue applying the same
+recurrence relation until $m$ reaches $n$. The result
+is
+$$F _{\left( 0, n + 1\right) } - F _{\left( 0, n\right) } = \frac{\left(  - 1\right)  ^{n} b _{0} \mathrm{ ... } b _{n}}{F _{\left( 1, n + 1\right) } \mathrm{ ... } F _{\left( n + 1, n + 1\right) } F _{\left( 1, n\right) } \mathrm{ ... } F _{\left( n, n\right) }} .$$
+
+
+<p>
+Now the problem is to simplify the two long products in the
+denominator. We notice that $F _{\left( 1, n\right) }$ has $F _{\left( 2, n\right) }$ in the denominator,
+and therefore $F _{\left( 1, n\right) } F _{\left( 2, n\right) } = F _{\left( 2, n\right) } a _{1} + b _{1}$. The next product is
+$F _{\left( 1, n\right) } F _{\left( 2, n\right) } F _{\left( 3, n\right) }$ and it simplifies to a linear function of
+$F _{\left( 3, n\right) }$, namely $F _{\left( 1, n\right) } F _{\left( 2, n\right) } F _{\left( 3, n\right) }$ =
+$\left( b _{1} + a _{1} a _{2}\right)  F _{\left( 3, n\right) } + b _{1} a _{2}$. So we can see that there is a
+general formula
+$$F _{\left( 1, n\right) } \mathrm{ ... } F _{\left( k, n\right) } = P _{k} + Q _{k} F _{\left( k, n\right) }$$
+with some coefficients $P _{k}$, $Q _{k}$ which do not actually depend on
+$n$ but only on the terms of the partial fraction up to $k$. In other
+words, these coefficients can be computed starting with $P _{1} = 0$,
+$Q _{1} = 1$ in the forward direction. The recurrence relations for $P _{k}$,
+$Q _{k}$ that we have seen above in the definition of $f _{k}$ follow from the identity $\left( P _{k} + Q _{k} F _{\left( k, n\right) }\right)  F _{\left( k + 1, n\right) }$ =
+$P _{k + 1} + Q _{k + 1} F _{\left( k + 1, n\right) }$.
+
+
+<p>
+Having found the coefficients $P _{k}$, $Q _{k}$, we can now rewrite the long products in the denominator, e.g.
+$$F _{\left( 1, n\right) } \mathrm{ ... } F _{\left( n, n\right) } = P _{n} + Q _{n} F _{\left( n, n\right) } = Q _{n + 1}.$$
+(We have used the recurrence relation for $Q _{n + 1}$.) Now it follows that
+$$f _{n + 1}\equiv F _{\left( 0, n + 1\right) } - F _{\left( 0, n\right) } = \frac{\left(  - 1\right)  ^{n} b _{0} \mathrm{ ... } b _{n}}{Q _{n + 1} Q _{n + 2}} .$$
+Thus we have converted the continued fraction into a series, i.e. $F _{\left( 0, n\right) } = \sum _{k = 0} ^{n} f _{k}$ with $f _{k}$ defined above.
+
+
+<p>
+
+<h3>
+<hr>Examples of continued fraction representations
+</h3>
+We have already mentioned that continued fractions give a computational advantage only when other methods are not available.
+There exist continued fraction representations of almost all functions, but in most cases the usual methods (Taylor series, identity transformations, Newton's method and so on) are superior.
+
+
+<p>
+
+<a name="continued fraction approximation!of $\arctan x$">
+
+</a>
+For example, the continued fraction
+$$\arctan x = \frac{x}{1 + \frac{x ^{2}}{3 + \frac{\left( 2 x\right)  ^{2}}{5 + \frac{\left( 3 x\right)  ^{2}}{7 + \mathrm{ ... }} } } } $$
+converges geometrically at all $x$.
+However, the Taylor series also converges geometrically and can be computed much faster than the continued fraction.
+
+
+<p>
+
+<a name="continued fraction approximation!of $\mathrm{erfc}\, x$">
+
+</a>
+There are some cases when a continued fraction representation is efficient.
+The complementary error function $\mathrm{erfc}\, x$ can be computed using the
+continued fraction due to Laplace (e.g. [Thacher 1963]),
+$$\frac{\sqrt{\pi }}{2}  x \exp \left( x ^{2}\right)  \mathrm{erfc}\, x = \frac{1}{1 + \frac{v}{1 + \frac{2 v}{1 + \frac{3 v}{1 + \mathrm{ ... }} } } } ,$$
+where $v\equiv \left( 2 x ^{2}\right)  ^{ - 1}$.
+This continued fraction converges for all (complex) $x$ except pure imaginary $x$.
+
+
+<p>
+
+<a name="continued fraction approximation!of $\Gamma \left( a, z\right) $">
+
+</a>
+The error function is a particular case of the incomplete Gamma function
+$$\Gamma \left( a, z\right) \equiv \int _{z} ^{ + \infty  } x ^{a - 1} \exp \left(  - x\right)  dx.$$
+There exists an analogous continued fraction representation due to Legendre (e.g. [Abramowitz <i>et al.</i>], 6.5.31),
+$$\Gamma \left( a, z\right)  = \frac{z ^{a - 1} \exp \left(  - z\right) }{1 + \frac{\left( 1 - a\right)  v}{1 + \frac{v}{1 + \frac{\left( 2 - a\right)  v}{1 + \frac{2 v}{1 + \mathrm{ ... }} } } } } ,$$
+where $v\equiv z ^{ - 1}$.
+
+
+<p>
+
+<a name="c4s10">
+
+</a>
+<h2>
+<hr>4.10 Estimating convergence of continued fractions
+</h2>
+Elsewhere in this book we have used elementary considerations to find the required number of terms in a power series.
+It is much more difficult
+to estimate the convergence rate of a continued fraction.
+In many cases this can be done using the theory of complex variable.
+Below we shall consider some cases when this computation is analytically tractable.
+
+
+<p>
+
+<a name="continued fraction approximation!convergence rate">
+
+</a>
+Suppose we are given the terms $a _{k}$, $b _{k}$ that define an infinite continued fraction, and we need to estimate its convergence rate.
+We have to find the number of terms $n$ for which the error of approximation is less than a given $\epsilon $.
+In our notation, we need to solve
+$\left| f _{n + 1}\right|  &lt; \epsilon $
+for $n$.
+
+
+<p>
+The formula that we derived for $f _{n + 1}$ gives an error estimate for
+the continued fraction truncated at the $n$-th term.
+But this formula contains the numbers $Q _{n}$ in the denominator.
+The main problem is to find how quickly the sequence $Q _{n}$ grows.
+The recurrence relation for this sequence can be rewritten as
+$$Q _{n + 2} = a _{n + 1} Q _{n + 1} + b _{n} Q _{n},$$
+for $k\geq 0$, with initial values $Q _{0} = 0$ and $Q _{1} = 1$.
+It is not always easy to get a handle on this sequence, because in most cases there is no closed-form expression for $Q _{n}$.
+
+
+<p>
+
+<a name="continued fraction approximation!error bound">
+
+</a>
+<h3>
+<hr>Simple bound on $Q _{n}$
+</h3>
+A simple lower bound on the growth of $Q _{n}$ can be obtained from the recurrence relation for $Q _{n}$.
+Assume that $a _{k} &gt; 0$, $b _{k} &gt; 0$.
+It is clear that all $Q _{n}$ are positive, so $Q _{n + 1}\geq a _{n} Q _{n}$.
+Therefore $Q _{n}$ grows at least as the product of all $a _{n}$:
+$$Q _{n + 1}\geq \prod _{i = 1} ^{n} a _{n}.$$
+This result gives the following upper bound on the precision,
+$$\left| f _{n + 1}\right| \leq \frac{b _{0} \mathrm{ ... } b _{n}}{\left( a _{1} \mathrm{ ... } a _{n}\right)  ^{2} a _{n + 1}} .$$
+
+
+<p>
+We have used this bound to estimate the relative error of the
+continued fraction expansion for $\arctan x$ at small $x$ (elsewhere in this book).
+However, we found that at large $x$ this bound becomes greater than 1.
+This does not mean that the continued fraction does not converge and cannot be used to compute $\arctan x$ when $x &gt; 1$, but merely
+indicates that the "simple bound" is too weak.
+The sequence $Q _{n}$ actually grows faster than the product of all $a _{k}$ and we
+need a tighter bound on this growth.
+In many cases such a bound can be obtained by the method of generating functions.
+
+
+<p>
+
+<h3>
+<hr>The method of generating functions
+</h3>
+<a name="continued fraction approximation!convergence rate!from generating functions">
+
+</a>
+The idea is to find a generating function $G\left( s\right) $ of the sequence $Q _{n}$ and then use an explicit form of $G\left( s\right) $ to obtain an asymptotic estimate of $Q _{n}$ at large $k$.
+
+
+<p>
+
+<a name="method of steepest descent">
+
+</a>
+The asymptotic growth of the sequence $Q _{n}$ can be estimated by the method of steepest descent, also known as Laplace's method.
+(See, e.g., [Olver 1974],
+ch. 3, sec. 7.5.)
+This method is somewhat complicated but quite powerful.
+The method requires that we find an integral representation for $Q _{n}$ (usually a contour integral in the complex plane).
+Then we can convert the integral into an asymptotic series in $k ^{ - 1}$.
+
+
+<p>
+
+<a name="continued fraction approximation!of $\mathrm{erfc}\, x$">
+
+</a>
+Along with the general presentation of the method, we shall consider an example when the convergence rate can be
+obtained analytically.
+The example is the representation of the complementary error function $\mathrm{erfc}\, x$,
+$$\frac{\sqrt{\pi }}{2}  x \exp \left( x ^{2}\right)  \mathrm{erfc}\, x = \frac{1}{1 + \frac{v}{1 + \frac{2 v}{1 + \frac{3 v}{1 + \mathrm{ ... }} } } } ,$$
+where $v\equiv \left( 2 x ^{2}\right)  ^{ - 1}$.
+We shall assume that $\left| v\right|  &lt; \frac{1}{2} $ since the continued fraction representation will not be used for small $x$ (where the Taylor series is efficient). 
+The terms of this continued fraction are: $a _{k} = 1$, $b _{k} = k v$, for $k\geq 1$, and $a _{0} = 0$, $b _{0} = 1$.
+
+
+<p>
+The "simple bound" would give $\left| f _{n + 1}\right| \leq v ^{n} n!$ and this expression grows with $n$.
+But we know that the above continued fraction actually converges for any $v$, so $f _{n + 1}$ must tend to zero for large $n$.
+It seems that the "simple bound" is not strong enough for any $v$ and we need a better bound.
+
+
+<p>
+
+<a name="generating function of a sequence">
+
+</a>
+An integral representation for $Q _{n}$ can be obtained using the method of generating functions.
+Consider a function $G\left( s\right) $ defined by the infinite series
+$$G\left( s\right)  = \sum _{n = 0} ^{\infty } Q _{n + 1} \frac{s ^{n}}{n!} .$$
+$G\left( s\right) $ is usually called the "generating function" of a sequence.
+We shifted the index to $n + 1$ for convenience, since $Q _{0} = 0$, so now $G\left( 0\right)  = 1$.
+
+
+<p>
+Note that the above series for the function $G\left( s\right) $ may or may not converge for any given $s$;
+we shall manipulate $G\left( s\right) $ as a formal power series until we obtain an explicit representation.
+What we really need is an analytic continuation of $G\left( s\right) $ to the complex $s$.
+
+
+<p>
+
+<a name="generating function of a sequence!obtaining">
+
+</a>
+It is generally the case that if we know a simple linear recurrence relation for a sequence, then we can also easily find its generating function.
+The generating function will satisfy a linear differential equation.
+To guess this equation, we write down the series for $G\left( s\right) $ and its
+derivative $G'\left( s\right) $ and try to find their linear combination which is
+identically zero because of the recurrence relation.
+(There is, of course, a computer algebra algorithm for doing this automatically.)
+
+
+<p>
+Taking the derivative $G'\left( s\right) $ produces the forward-shifted series
+$$G'\left( s\right)  = \sum _{n = 0} ^{\infty } Q _{n + 2} \frac{s ^{n}}{n!} .$$
+Multiplying $G\left( s\right) $ by $s$ produces a back-shifted series with each term multiplied by $n$:
+$$s G\left( s\right)  = \sum _{n = 0} ^{\infty } n Q _{n} \frac{s ^{n}}{n!} .$$
+If the recurrence relation for $Q _{n}$ contains only constants and polynomials in $n$, then we can easily convert that relation into a differential equation for $G\left( s\right) $.
+We only need to find the right combination of back- and forward-shifts and multiplications by $n$.
+
+
+<p>
+In the case of our sequence $Q _{n}$ above, the recurrence relation is
+$$Q _{n + 2} = Q _{n + 1} + v n Q _{n}.$$
+This is equivalent to the differential equation
+$$G'\left( s\right)  = \left( 1 + v s\right)  G\left( s\right) .$$
+The solution with the obvious initial condition $G\left( 0\right)  = 1$ is
+$$G\left( s\right)  = \exp \left( s + \frac{v s ^{2}}{2} \right) .$$
+
+
+<p>
+
+<a name="generating function of a sequence!integral representation">
+
+</a>
+The second step is to obtain an integral representation for $Q _{n}$, so that we could use the method of steepest descents and find its asymptotic at large $n$.
+
+
+<p>
+In our notation $Q _{n + 1}$ is equal to the $n$-th derivative of the generating function at $s = 0$:
+$$Q _{n + 1} = \frac{d^n}{d s ^n}G\left( s = 0\right) ,$$
+but it is generally not easy to estimate the growth of this derivative at large $n$.
+
+
+<p>
+There are two ways to proceed.
+One is to obtain an integral representation for $G\left( s\right) $, for instance
+$$G\left( s\right)  = \int _{ - \infty } ^{\infty  } F\left( t, s\right)  dt,$$
+where $F\left( t, s\right) $ is some known function.
+Then an integral representation for $Q _{n}$ will be found by differentiation.
+But it may be difficult to find such $F\left( t, s\right) $.
+
+
+<p>
+The second possibility is to express $Q _{n}$ as a contour integral in the complex plane around $s = 0$ in the counter-clockwise direction:
+$$Q _{n} = \frac{\left( n - 1\right) !}{2 \pi  \imath }  \int G\left( s\right)  s ^{ - n} ds.$$
+If we know the singularities and of $G\left( s\right) $, we may transform the contour of the integration into a path that is more convenient for the method of the steepest descent.
+This procedure is more general but requires a detailed understanding of the behavior of $G\left( s\right) $ in the complex plane.
+
+
+<p>
+
+<a name="Stirling's formula">
+
+</a>
+<a name="continued fraction approximation!of $\mathrm{erfc}\, x$!error estimate">
+
+</a>
+In the particular case of the continued fraction for $\mathrm{erfc}\, x$, the calculations are somewhat easier if $Re\left( v\right)  &gt; 0$ (where $v\equiv \frac{1}{2 x ^{2}} $).
+Full details are given in a separate section.
+The result for $Re\left( v\right)  &gt; 0$ is
+$$Q _{n}\approx \frac{\left( v n\right)  ^{\frac{n}{2} }}{\sqrt{2 n v}}  \exp \left( \sqrt{\frac{n}{v} } - \frac{1}{4 v}  - \frac{n}{2} \right) .$$
+This, together with Stirling's formula
+$$n!\approx \sqrt{2 \pi  n} \left( \frac{n}{e} \right)  ^{n},$$
+allows to estimate the error of the continued fraction approximation:
+$$f _{n + 1}\approx 2 \left(  - 1\right)  ^{n + 1} \sqrt{\frac{2 \pi }{v} } \exp \left(  - 2 \sqrt{\frac{n}{v} } + \frac{1}{2 v} \right) .$$
+
+
+<p>
+Note that this is not merely a bound but an actual asymptotic estimate of $f _{n + 1}$.
+(Stirling's formula can also be derived using the method of
+steepest descent from an integral representation of the Gamma function,
+in a similar way.)
+
+
+<p>
+Defined as above, the value of $f _{n + 1}$ is in general a complex number. The absolute value of $f _{n + 1}$ can be found using the formula
+$$Re\left( \sqrt{\frac{n}{v} }\right)  = \sqrt{\frac{n}{2} } \sqrt{1 + \frac{Re\left( v\right) }{\left| v\right| } }.$$
+We obtain
+$$\left| f _{n + 1}\right| \approx 2 \sqrt{\frac{2 \pi }{\left| v\right| } } \exp \left(  - \sqrt{2 n} \sqrt{1 + \frac{Re\left( v\right) }{\left| v\right| } } + \frac{Re\left( v\right) }{2 \left| v\right|  ^{2}} \right) .$$ 
+
+
+<p>
+When $Re\left( v\right) \leq 0$, the same formula can be used (this can be shown by a more careful consideration of the branches of the square roots).
+The continued fraction does not converge when $Re\left( v\right)  &lt; 0$ and $Im\left( v\right)  = 0$ (i.e. for pure imaginary $x$).
+This can be seen from the above formula: in that case $Re\left( v\right)  =  - \left| v\right| $ and $\left| f _{n + 1}\right| $ does not decrease when $n$ grows.
+
+
+<p>
+These estimates show that the error of the continued fraction approximation to $\mathrm{erfc}\, x$ (when it converges)
+decreases with $n$ slower than in a geometric progression.
+This means that we need to take $O\left( P ^{2}\right) $ terms to get $P$ digits of precision.
+
+
+<p>
+
+<h3>
+<hr>Derivations for the example with $\mathrm{erfc}\, x$
+</h3>
+Here we give a detailed calculation of the convergence rate of the continued fraction for $\mathrm{erfc}\, x$ using the method of generating functions.
+
+
+<p>
+
+<h5>
+A simpler approach
+</h5>
+<a name="method of steepest descent!example for real $x$">
+
+</a>
+In our case, $G\left( s\right) $ is a function with a known Fourier transform and we can obtain a straightforward representation valid when $Re\left( v\right)  &gt; 0$,
+$$Q _{n + 1} = \frac{1}{\sqrt{2 \pi  v}}  \int _{ - \infty } ^{\infty  } \left( 1 + t\right)  ^{n} \exp \left(  - \frac{t ^{2}}{2 v} \right)  dt.$$
+We shall first apply the method of steepest descent to this integral (assuming real $v &gt; 0$ for simplicity) and then consider the more general procedure with the contour integration.
+
+
+<p>
+To use the method of steepest descent, we represent the integrand as an exponential of some function $g\left( t, n\right) $ and find "stationary points" where this function has local maxima:
+$$Q _{n + 1} = \frac{1}{\sqrt{2 \pi  v}}  \int _{ - \infty } ^{\infty  } \exp \left( g\left( t, n\right) \right)  dt,$$
+$$g\left( t, n\right) \equiv  - \frac{t ^{2}}{2 v}  + n \ln \left( 1 + t\right) .$$
+(Note that the logarithm here must acquire an imaginary part $\imath  \pi $ for $t&lt;-1$,
+and we should take the real part which is equal to $\ln \left| 1 + t\right| $.
+We shall see that the integral over negative $t$ is negligible.)
+We expect that when $n$ is large, $Re\left( g\left( t, n\right) \right) $ will have a peak or several peaks at certain values of $t$.
+When $t$ is not close to the peaks, the value of $Re\left( g\left( t, n\right) \right) $ is smaller and,
+since $g$ is in the exponential, the integral is dominated by the
+contribution of the peaks.
+This is the essence of the method of steepest descent on the real line.
+
+
+<p>
+We only need to consider very large values of $n$, so we can neglect terms of order $O\left( \frac{1}{\sqrt{n}} \right) $ or smaller.
+We find that, in our case, two peaks of $Re\left( g\right) $ occur at approximately $t_{1}\approx  - \frac{1}{2}  + \sqrt{n v}$ and $t_{2}\approx  - \frac{1}{2}  - \sqrt{n v}$.
+We assume that $n$ is large enough so that $n v &gt; \frac{1}{2} $. Then the first peak is at a positive $t$ and the second peak is at a negative $t$.
+The contribution of the peaks can be computed from the Taylor approximation of $g\left( t, n\right) $ near the peaks.
+We can expand, for example,
+$$g\left( t, n\right) \approx g\left( t_{1}, n\right)  + \left( \frac{\partial^2}{\partial t ^2}g\left( t_{1}, n\right) \right)  \frac{\left( t - t_{1}\right)  ^{2}}{2} $$
+near $t = t_{1}$.
+The values $g\left( t_{1}, n\right) $ and $\frac{\partial^2}{\partial t ^2}g\left( t_{1}, n\right) $, and likewise for $t_{2}$, are constants that we already know since we know $t_{1}$ and $t_{2}$.
+Then the integral of $\exp \left( g\right) $ will be approximated by the integral
+$$\int _{ - \infty } ^{\infty  } \exp \left( g\left( t_{1}, n\right)  + \left( \frac{\partial^2}{\partial t ^2}g\left( t_{1}, n\right) \right)  \frac{\left( t - t_{1}\right)  ^{2}}{2} \right)  dt.$$
+(Note that $\frac{\partial^2}{\partial t ^2}g\left( t_{1}, n\right) $ is negative.)
+This is a Gaussian integral that can be easily evaluated, with the result
+$$\mathrm{ exp }\left( g\left( t_{1}, n\right) \right)  \sqrt{ - \frac{2 \pi }{\frac{\partial^2}{\partial t ^2}g\left( t_{1}, n\right) } }.$$
+This is the leading term of the contribution of the peak at $t_{1}$;
+there will be a similar expression for the contribution of $t_{2}$.
+We find that the peak at $t_{1}$ gives a larger contribution, by the factor $\exp \left( 2 \sqrt{\frac{n}{v} }\right) $.
+This factor is never small since $n &gt; 1$ and $v &lt; \frac{1}{2} $.
+So it is safe to ignore the peak at $t_{2}$ for the purposes of our analysis.
+
+
+<p>
+Then we obtain the estimate
+$$Q _{n + 1}\approx \frac{1}{\sqrt{2}}  \exp \left( \sqrt{\frac{n}{v} } - \frac{1}{4 v}  - \frac{n}{2} \right)  \left( v n\right)  ^{\frac{n}{2} }.$$
+
+
+<p>
+
+<h5>
+The contour integral approach
+</h5>
+In many cases it is impossible to compute the Fourier transform of the generating function $G\left( s\right) $.
+Then one can use the contour integral approach.
+One should represent the integrand as
+$$G\left( s\right)  s ^{ - n} = \exp \left( g\left( s\right) \right) $$
+where
+$$g\left( s\right) \equiv \ln G\left( s\right)  - n \ln s,$$
+and look for stationary points of $g\left( s\right) $ in the complex plane ($0 = 0$).
+The original contour is around the pole $s = 0$ in the counter-clockwise direction.
+We need to deform that contour so that the new contour passes through the stationary points.
+The contour should cross each stationary point in a certain direction in the complex plane.
+The direction is chosen to make the stationary point the sharpest local maximum of $Re\left( g\left( s\right) \right) $ on the contour.
+
+
+<p>
+Usually one of the stationary points has the largest value of $Re\left( g\left( s\right) \right) $; this is the dominant stationary point.
+If $s_{0}$ is the dominant stationary point and $g_{2} = \frac{d^2}{d s ^2}g\left( s_{0}\right) $ is the second derivative of $g$ at that point, then the asymptotic of the integral is
+$$\frac{1}{2 \pi }  \int \exp \left( g\left( s\right) \right)  ds = \frac{1}{\sqrt{2 \pi  \left| g_{2}\right| }}  \exp \left( g\left( s_{0}\right) \right) .$$
+(The integral will have a negative sign if the contour crosses the point $s_{0}$ in the negative imaginary direction.)
+
+
+<p>
+We have to choose a new contour and check the convergence of the resulting integral separately.
+In each case we may need to isolate the singularities of $G\left( s\right) $ or to find the regions of infinity where $G\left( s\right) $ quickly decays (so that the infinite parts of the contour might be moved there).
+There is no prescription that works for all functions $G\left( s\right) $.
+
+
+<p>
+Let us return to our example.
+For
+$G\left( s\right)  = \exp \left( s + \frac{v s ^{2}}{2} \right) $,
+the function $g\left( s\right) $ has no singularities except the pole at $s = 0$.
+There are two stationary points located at the (complex) roots $s_{1}$, $s_{2}$ of the quadratic equation
+$v s ^{2} + s - n = 0$.
+Note that $v$ is an arbitrary (nonzero) complex number.
+We now need to find which of the two stationary points gives the dominant contribution.
+By comparing $Re\left( g\left( s_{1}\right) \right) $ and $Re\left( g\left( s_{2}\right) \right) $ we find
+that the point $s$ with the largest real part gives the dominant contribution.
+However, if $Re\left( s_{1}\right)  = Re\left( s_{2}\right) $ (this happens only if $v$ is real and $v &lt; 0$, i.e. if $x$ is pure imaginary), then both stationary points contribute equally.
+Barring that possibility, we find
+(with the usual definition of the complex square root) that
+the dominant contribution for large $n$ is from the stationary point at
+$$s_{1} = \frac{\sqrt{4 n v + 1} - 1}{2 v} .$$
+The second derivative of $g\left( s\right) $ at the stationary point is approximately $2 v$.
+The contour of integration can be deformed into a line passing through the dominant stationary point in the positive imaginary direction.
+Then the leading asymptotic is found using the Gaussian approximation (assuming $Re\left( v\right)  &gt; 0$):
+$$Q _{n} = \frac{\left( n - 1\right) ! v ^{\frac{n}{2} }}{\sqrt{4 \pi  v}}  \exp \left( \frac{n \left( 1 - \ln n\right) }{2}  + \sqrt{\frac{n}{v} } - \frac{1}{4 v} \right) .$$
+
+
+<p>
+
+<a name="Stirling's formula">
+
+</a>
+This formula agrees with the asymptotic for $Q _{n + 1}$ found above for real $v &gt; 0$, when we use Stirling's formula for $\left( n - 1\right) !$:
+$$\left( n - 1\right) ! = \sqrt{2 \pi } e ^{ - n} n ^{n - \frac{1}{2} }.$$
+
+
+<p>
+The treatment for $Re\left( v\right)  &lt; 0$ is similar.
+
+
+<p>
+
+<a name="c4s11">
+
+</a>
+<h2>
+<hr>4.11 Newton's method and its improvements
+</h2>
+Newton's method (also called the Newton-Raphson method) of numerical solution of algebraic equations and its generalizations
+can be used to obtain multiple-precision values of several elementary functions.
+
+
+<p>
+
+<h3>
+<hr>Newton's method
+</h3>
+<a name="Newton's method">
+
+</a>
+The basic formula is widely known: If $f\left( x\right)  = 0$ must be solved, one starts with a value of $x$ that is close to some root and iterates $$x' = x - f\left( x\right)  \left( \frac{d}{d x}f\left( x\right) \right)  ^{ - 1}.$$
+This formula is based on the approximation of the function $f\left( x\right) $ by a tangent line at some point $x$. A Taylor expansion in the neighborhood of the root shows that (for an initial value $x _{0}$ sufficiently close to the root) each iteration gives at least twice as many correct digits of the root as the previous one ("quadratic convergence"). Therefore the complexity of this algorithm is proportional to a logarithm of the required precision and to the time it takes to evaluate the function and its derivative. Generalizations of this method require computation of higher derivatives of the function $f\left( x\right) $ but successive approximations to the root converge several times faster (the complexity is still logarithmic).
+
+
+<p>
+
+<a name="Newton's method!initial value">
+
+</a>
+Newton's method sometimes suffers from a sensitivity to the initial guess.
+If the initial value $x _{0}$ is not chosen sufficiently close to the root, the iterations may converge very slowly or not converge at all. To remedy this, one can combine Newton's iteration with simple bisection. Once the root is bracketed inside an interval ($a$, $b$), one checks whether $\frac{a + b}{2} $ is a better approximation for the root than that obtained from Newton's iteration. This guarantees at least linear convergence in the worst case.
+
+
+<p>
+
+<a name="Newton's method!cubic convergence">
+
+</a>
+For some equations $f\left( x\right)  = 0$, Newton's method converges faster than quadratically.
+For example, solving $\sin x = 0$ in the neighborhood of $x = 3.14159$ gives "cubic" convergence, i.e. the number of correct digits is tripled at each step.
+This happens because $\sin x$ near its root $x = \pi $ has a vanishing second derivative and thus the function is particularly well approximated by a straight line.
+
+
+<p>
+
+<h3>
+<hr>Halley's method
+</h3>
+<a name="Halley's method">
+
+</a>
+<i>Halley's method</i> is an improvement over Newton's method that makes each equation well approximated by a straight line near the root.
+Edmund Halley computed fractional powers, $x = \sqrt[n]{a}$, by the iteration
+$$x' = x \frac{n \left( a + x ^{n}\right)  + a - x ^{n}}{n \left( a + x ^{n}\right)  - \left( a - x ^{n}\right) } .$$
+This formula is equivalent to Newton's method applied to the equation
+$x ^{n - q} = a x ^{ - q}$ with $q = \frac{n - 1}{2} $. This iteration has a cubic convergence rate. This is the fastest method to compute $n$-th roots ($n\geq 3$) with multiple precision. Iterations with higher order of convergence, for example, the method with quintic convergence rate
+$$x' = x \frac{\frac{n - 1}{n + 1}  \frac{2 n - 1}{2 n + 1}  x ^{2 n} + 2 \frac{2 n - 1}{n + 1}  x ^{n} a + a ^{2}}{x ^{2 n} + 2 \frac{2 n - 1}{n + 1}  x ^{n} a + \frac{n - 1}{n + 1}  \frac{2 n - 1}{2 n + 1}  a ^{2}} ,$$
+require more arithmetic operations per step and are in fact less efficient at high precision.
+
+
+<p>
+Halley's method can be generalized to any function $f\left( x\right) $. A cubically convergent iteration is always obtained if we replace the equation $f\left( x\right)  = 0$ by an equivalent equation
+$$g\left( x\right) \equiv \frac{f\left( x\right) }{\sqrt{\left| \frac{d}{d x}f\left( x\right) \right| }}  = 0$$
+and use the standard Newton's method on it.
+Here the function $g\left( x\right) $ is chosen so that its second derivative vanishes ($\frac{d^2}{d x ^2}g\left( x\right)  = 0$) at the root of the equation $f\left( x\right)  = 0$, independently of where this root is.
+For example, the equation $\exp \left( x\right)  = a$ is transformed into $g\left( x\right) \equiv \exp \left( \frac{x}{2} \right)  - a \exp \left(  - \frac{x}{2} \right)  = 0$.
+(There is no unique choice of the function $g\left( x\right) $ and sometimes another choice will make the iteration more quickly computable.)
+
+
+<p>
+
+<a name="Halley's method!explicit formula">
+
+</a>
+The Halley iteration for the equation $f\left( x\right)  = 0$ can be written as
+$$x' = x - \frac{2 f\left( x\right)  \left( \frac{d}{d x}f\left( x\right) \right) }{2 \left( \frac{d}{d x}f\left( x\right) \right)  ^{2} - f\left( x\right)  \left( \frac{d^2}{d x ^2}f\left( x\right) \right) } .$$
+
+
+<p>
+Halley's iteration, despite its faster convergence rate, may be more cumbersome to evaluate than Newton's iteration and so it may not provide a more efficient numerical method for a given function.
+Only in some special cases is Halley's iteration just as simple to compute as Newton's iteration.
+
+
+<p>
+Halley's method is sometimes less sensitive to the choice of the initial point $x _{0}$.
+An extreme example of sensitivity to the initial point is the equation $x ^{ - 2} = 12$ for which Newton's iteration $x' = \frac{3}{2}  x - 6 x ^{3}$ converges to the root only from initial points $0 &lt; x _{0} &lt; 0.5$ and wildly diverges otherwise, while Halley's iteration converges to the root from any $x _{0} &gt; 0$.
+
+
+<p>
+It is at any rate not true that Halley's method always converges better than Newton's method. For instance, it diverges on the equation $2 \cos x = x$ unless started at $x _{0}$ within the interval ($ - \frac{1}{6}  \pi $,$\frac{7}{6}  \pi $). Another example is the equation $\ln x = a$. This equation allows to compute $x = \exp \left( a\right) $ if a fast method for computing $\ln x$ is available (e.g. the AGM-based method). For this equation, Newton's iteration
+$$x' = x \left( 1 + a - \ln x\right) $$
+converges for any $0 &lt; x &lt; \exp \left( a + 1\right) $, while Halley's iteration
+converges only if $\exp \left( a - 2\right)  &lt; x &lt; \exp \left( a + 2\right) $.
+
+
+<p>
+
+<a name="Halley's method!when to use">
+
+</a>
+When it converges, Halley's iteration can still converge very slowly for certain functions $f\left( x\right) $, for example, for $f\left( x\right)  = x ^{n} - a$ if $n ^{n} &gt; a$. For such functions that have very large and rapidly changing derivatives, no general method can converge faster than linearly. In other words, a simple bisection will generally do just as well as any sophisticated iteration, until the root is approximated very precisely.
+Halley's iteration combined with bisection seems to be a good choice for such problems.
+
+
+<p>
+
+<h3>
+<hr>When to use Halley's method
+</h3>
+Despite its faster convergence, Halley's iteration frequently gives no advantage over Newton's method.
+To obtain $P$ digits of the result, we need about $\frac{\ln P}{\ln 2} $ iterations of a quadratically convergent method and about $\frac{\ln P}{\ln 3} $ iterations of a cubically convergent method.
+So the cubically convergent iteration is faster only if the time taken by cubic one iteration is less than about $\frac{\ln 3}{\ln 2} \approx 1.6$ of the time of one quadratic iteration.
+
+
+<p>
+
+<h3>
+<hr>Higher-order schemes
+</h3>
+<a name="Newton's method!higher-order schemes">
+
+</a>
+Sometimes it is easy to generalize Newton's iteration to higher-order schemes.
+There are general formulae such as Shroeder's and Householder's iterations.
+We shall give some examples where the construction is very straightforward.
+In all examples $x$ is the initial approximation and the next approximation is obtained by truncating the given series.
+
+
+<p>
+<ul><li>Inverse </li>$\frac{1}{a} $.
+Set $y = 1 - a x$, then
+$$\frac{1}{a}  = \frac{x}{1 - y}  = x \left( 1 + y + y ^{2} + \mathrm{ ... }\right) .$$
+<li>Square root </li>$\sqrt{a}$.
+Set $y = 1 - a x ^{2}$, then
+$$\sqrt{a} = \frac{\sqrt{1 - y}}{x}  = \frac{1}{x}  \left( 1 - \frac{1}{2}  y - \frac{1}{8}  y ^{2} - \mathrm{ ... }\right) .$$
+<li>Inverse square root </li>$\frac{1}{\sqrt{a}} $.
+Set $y = 1 - a x ^{2}$, then
+$$\frac{1}{\sqrt{a}}  = \frac{x}{\sqrt{1 - y}}  = x \left( 1 + \frac{1}{2}  y + \frac{3}{8}  y ^{2} + \mathrm{ ... }\right) .$$
+<li></li>$n$-th root $\sqrt[n]{a}$.
+Set $y = 1 - a x ^{n}$, then
+$$\sqrt[n]{a} = \frac{\sqrt[n]{1 - y}}{x}  = \frac{1}{x}  \left( 1 - \frac{1}{n}  y - \frac{n - 1}{2 n ^{2}}  y ^{2} - \mathrm{ ... }\right) .$$
+<li>Exponential </li>$\exp \left( a\right) $.
+Set $y = a - \ln x$, then
+$$\exp \left( a\right)  = x \exp \left( y\right)  = x \left( 1 + y + \frac{y ^{2}}{2!}  + \frac{y ^{3}}{3!}  + \mathrm{ ... }\right) .$$
+<li>Logarithm </li>$\ln a$.
+Set $y = 1 - a \exp \left(  - x\right) $, then
+$$\ln a = x + \ln \left( 1 - y\right)  = x - y - \frac{y ^{2}}{2}  - \frac{y ^{3}}{3}  - \mathrm{ ... }.$$
+</ul>
+
+<p>
+In the above examples, $y$ is a small quantity and the series represents corrections to the initial value $x$, therefore the order of convergence is equal to the first discarded order of $y$ in the series.
+
+
+<p>
+These simple constructions are possible because the functions satisfy simple identities, such as $\exp \left( a + b\right)  = \exp \left( a\right)  \exp \left( b\right) $ or $\sqrt{a b} = \sqrt{a} \sqrt{b}$.
+For other functions the formulae quickly become very complicated and unsuitable for practical computations.
+
+
+<p>
+
+<h3>
+<hr>Precision control
+</h3>
+<a name="Newton's method!precision control">
+
+</a>
+Newton's method and its generalizations are particularly convenient for multiple precision calculations because of their insensitivity to accumulated errors:
+if at some iteration $x _{k}$ is found with a small error, the error will be corrected at the next iteration.
+Therefore it is not necessary to compute all iterations with the full required precision; each iteration needs to be performed at the precision of the root expected from that iteration (plus a few more digits to allow for round-off error).
+For example, if we know that the initial approximation is accurate to 3 digits, then (assuming quadratic convergence)
+<h6>This disregards the possibility that the convergence might be slightly slower. For example, when the precision at one iteration is $n$ digits, it might be $2 n - 10$ digits at the next iteration. In these (fringe) cases, the initial approximation must be already precise enough (e.g. to at least 10 digits in this example).</h6>it is enough to perform the first iteration to 6 digits, the second iteration to 12 digits and so on. In this way, multiple-precision calculations are enormously speeded up.
+
+
+<p>
+For practical evaluation, iterations must be supplemented with "quality control".
+For example, if $x_{0}$ and $x_{1}$ are two consecutive approximations that are
+already very close, we can quickly compute the achieved (relative) precision by
+finding the number of leading zeros in the number $$\frac{\left| x_{0} - x_{1}\right| }{\max \left( x_{0}, x_{1}\right) } .$$
+This
+is easily done using the bit count function. After performing a small number of
+initial iterations at low precision, we can make sure that $x_{1}$ has at least a
+certain number of correct digits of the root. Then we know which precision to
+use for the next iteration (e.g. triple precision if we are using a cubically
+convergent scheme). It is important to perform each iteration at the precision
+of the root which it will give and not at a higher precision; this saves a
+great deal of time since all calculations are very slow at high precision.
+
+
+<p>
+
+<h3>
+<hr>Fine-tuning the working precision
+</h3>
+To reduce the computation time, it is important to write the iteration formula with explicit separation of higher-order quantities.
+For example, Newton's iteration for the inverse square root $\frac{1}{\sqrt{a}} $ can be written either as
+$$x' = x \frac{3 - a x ^{2}}{2} $$
+or equivalently as
+$$x' = x + x \frac{1 - a x ^{2}}{2} .$$
+At first sight the first formula seems simpler because it saves one long addition.
+However, the second formula can be computed significantly faster than the first one, if we are willing to exercise a somewhat more fine-grained control of the working precision.
+
+
+<p>
+Suppose $x$ is an approximation that is correct to $P$ digits; then we expect the quantity $x'$ to be correct to $2 P$ digits.
+Therefore we should perform calculations in the first formula with $2 P$ digits;
+this means three long multiplications, $3 M\left( 2 P\right) $.
+Now consider the calculation in the second formula.
+First, the quantity $y\equiv 1 - a x ^{2}$ is computed using two $2 P$-digit multiplications.
+<h6>In fact, both multiplications are a little shorter, since $x$ is a number with only $P$ correct digits; we can compute $a x$ and then $a x ^{2}$ as products of a $2 P$-digit number and a $P$-digit number, with a $2 P$-digit result. We ignore this small difference.</h6>Now, the number $y$ is small and has only $P$ nonzero digits.
+Therefore the third multiplication $x y$ costs only $M\left( P\right) $, not $M\left( 2 P\right) $.
+This is a significant time savings, especially with slower multiplication.
+The total cost is now $2 M\left( 2 P\right)  + M\left( P\right) $.
+
+
+<p>
+The advantage is even greater with higher-order methods.
+For example, a fourth-order iteration for the inverse square root can be written as
+$$x' = x + \frac{1}{2}  x y + \frac{3}{8}  x y ^{2} + \frac{5}{16}  x y ^{3},$$
+where $y\equiv 1 - a x ^{2}$.
+Suppose $x$ is an approximation that is correct to $P$ digits; we expect $4 P$ correct digits in $x'$.
+We need two long multiplications in precision $4 P$ to compute $y$, then $M\left( 3 P\right) $ to compute $x y$, $M\left( 2 P\right) $ to compute $x y ^{2}$, and $M\left( P\right) $ to compute $x y ^{3}$.
+The total cost is $2 M\left( 4 P\right)  + M\left( 3 P\right)  + M\left( 2 P\right)  + M\left( P\right) $.
+
+
+<p>
+
+<a name="Newton's method!asymptotic cost">
+
+</a>
+The asymptotic cost of finding the root $x$ of the equation $f\left( x\right)  = 0$ with $P$ digits of precision is usually the same as the cost of computing $f\left( x\right) $ [Brent 1975].
+The main argument can be summarized by the following simple example.
+To get the result to $P$ digits, we need $O\left( \ln P\right) $ Newton's iterations.
+At each iteration we shall have to compute the function $f\left( x\right) $ to a certain number of digits.
+Suppose that we start with one correct digit and that each iteration costs us $c M\left( 2 P\right) $ operations where $c$ is a given constant, while the number of correct digits grows from $P$ to $2 P$.
+Then the total cost of $k$ iterations is
+$$c M\left( 2\right)  + c M\left( 4\right)  + c M\left( 8\right)  + \mathrm{ ... } + c M\left( 2 ^{k}\right) .$$
+If the function $M\left( P\right) $ grows linearly with $P = 2 ^{k}$, then we can estimate this sum roughly as $2 c M\left( P\right) $; if $M\left( P\right)  = O\left( P ^{2}\right) $ then the result is about $\frac{4}{3}  c M\left( P\right) $.
+It is easy to see that when $M\left( P\right) $ is some power of $P$ that grows faster than linear, the sum is not larger than a small multiple of $M\left( P\right) $.
+
+
+<p>
+Thus, if we have a fast method of computing, say, $\arctan x$, then we immediately obtain a method of computing $\tan x$ which is asymptotically as fast (up to a constant).
+
+
+<p>
+
+<h3>
+<hr>Choosing the optimal order
+</h3>
+<a name="Newton's method!optimal order">
+
+</a>
+Suppose we need to compute a function by Newton's method to precision $P$.
+We can sometimes find iterations of any order of convergence.
+For example, a $k$-th order iteration for the reciprocal $\frac{1}{a} $ is
+$$x' = x + x y + x y ^{2} + \mathrm{ ... } + x y ^{k - 1},$$
+where $y\equiv 1 - a x$.
+The cost of one iteration with final precision $P$ is
+$$C\left( k, P\right) \equiv M\left( \frac{P}{k} \right)  + M\left( \frac{2 P}{k} \right)  + M\left( \frac{3 P}{k} \right)  + \mathrm{ ... } + c M\left( P\right) .$$
+(Here the constant $c\equiv 1$ is introduced for later convenience.
+It denotes the number of multiplications needed to compute $y$.)
+
+
+<p>
+Increasing the order by $1$ costs us comparatively little, and
+we may change the order $k$ at any time.
+Is there a particular order $k$ that gives the smallest computational cost and should be used for all iterations, or the order needs to be adjusted during the computation?
+A natural question is to find the optimal computational strategy.
+
+
+<p>
+It is difficult to fully analyze this question, but it seems that choosing a particular order $k$ for all iterations is close to the optimal strategy.
+
+
+<p>
+A general "strategy" is a set of orders $S\left( P, P _{0}\right) $=($k _{1}$, $k _{2}$, ..., $k _{n}$) to be chosen at the first, second, ..., $n$-th iteration, given the initial precision $P _{0}$ and the required final precision $P$.
+At each iteration, the precision will be multiplied by the factor $k _{i}$.
+The optimal strategy $S\left( P, P _{0}\right) $ is a certain function of $P _{0}$ and $P$ such that the required precision is reached, i.e.
+$$P _{0} k _{1} \mathrm{ ... } k _{n} = P,$$
+and the cost
+$$C\left( k _{1}, P _{0} k _{1}\right)  + C\left( k _{2}, P _{0} k _{1} k _{2}\right)  + \mathrm{ ... } + C\left( k _{n}, P\right) $$
+is minimized.
+
+
+<p>
+If we assume that the cost of multiplication $M\left( P\right) $ is proportional to some power of $P$, for instance $M\left( P\right)  = P ^{\mu }$, then
+the cost of each iteration and the total cost are homogeneous functions of $P$ and $P _{0}$.
+Therefore the optimal strategy is a function only of the ratio $\frac{P}{P _{0}} $.
+We can multiply both $P _{0}$ and $P$ by a constant factor and the optimal strategy will remain the same.
+We can denote the optimal strategy $S\left( \frac{P}{P _{0}} \right) $.
+
+
+<p>
+We can check whether it is better to use several iterations at smaller orders instead of one iteration at a large order.
+Suppose that  $M\left( P\right)  = P ^{\mu }$, the initial precision is 1 digit, and the final precision $P = k ^{n}$.
+We can use either $n$ iterations of the order $k$ or 1 iteration of the order $P$.
+The cost of one iteration of order $P$ at target precision $P$ is
+$C\left( P, P\right) $, whereas the total cost of $n$ iterations of order $k$ is
+$$C\left( k, k\right)  + C\left( k, k ^{2}\right)  + \mathrm{ ... } + C\left( k, k ^{n}\right) .$$
+With $C\left( k, P\right) $ defined above, we can take approximately
+$$C\left( k, p\right) \approx p ^{\mu } \left( c - 1 + \frac{k}{\mu  + 1} \right) .$$
+Then the cost of one $P$-th order iteration is
+$$P ^{\mu } \left( c - 1 + \frac{P}{\mu  + 1} \right) ,$$
+while the cost of $n$ iterations of the order $k$ is clearly smaller since $k &lt; P$,
+$$P ^{\mu } \left( c - 1 + \frac{k}{\mu  + 1} \right)  \frac{k ^{\mu }}{k ^{\mu } - 1} .$$
+At fixed $P$, the best value of $k$ is found by minimizing this function.
+For $c = 1$ (reciprocal) we find $k = \sqrt[\mu ]{1 + \mu }$ which is never above $2$.
+This suggests that $k = 2$ is the best value for finding the reciprocal $\frac{1}{a} $.
+However, larger values of $c$ can give larger values of $k$.
+The  equation for the optimal value of $k$ is
+$$\frac{k ^{\mu  + 1}}{\mu  + 1}  - k = \mu  \left( c - 1\right) .$$
+
+
+<p>
+So far we have only considered strategies that use the same order $k$ for all iterations, and we have not yet shown that such strategies are the best ones.
+We now give a plausible argument (not quite a rigorous proof) to justify this claim.
+
+
+<p>
+Consider the optimal strategy $S\left( P ^{2}\right) $ for the initial precision $1$ and the final precision $P ^{2}$, when $P$ is very large.
+Since it is better to use several iterations at lower orders, we may assume that the strategy $S\left( P ^{2}\right) $ contains many iterations and that one of these iterations reaches precision $P$.
+Then the strategy $S\left( P ^{2}\right) $ is equivalent to a sequence of the two optimal strategies to go from $1$ to $P$ and from $P$ to $P ^{2}$.
+However, both strategies must be the same because the optimal strategy only depends on the ratio of precisions.
+Therefore, the optimal strategy $S\left( P ^{2}\right) $ is a sequence of two identical strategies ($S\left( P\right) $, $S\left( P\right) $).
+
+
+<p>
+Suppose that $k _{1}$ is the first element of $S\left( P\right) $.
+The optimal strategy to go from precision $k _{1}$ to precision $P k _{1}$ is also $S\left( P\right) $.
+Therefore the second element of $S\left( P\right) $ is also equal to $k _{1}$, and by extension
+all elements of $S\left( P\right) $ are the same.
+
+
+<p>
+A similar consideration gives the optimal strategy for other iterations that compute inverses of analytic functions, such as Newton's iteration for the inverse square root or for higher roots.
+The difference is that the value of $c$ should be chosen as the equivalent number of multiplications needed to compute the function.
+For instance, $c = 1$ for division and $c = 2$ for the inverse square root iteration.
+
+
+<p>
+The conclusion is that in each case we should compute the optimal order $k$ in advance and use this order for all iterations.
+
+
+<p>
+
+<a name="c4s12">
+
+</a>
+<h2>
+<hr>4.12 Fast evaluation of Taylor series
+</h2>
+<a name="Taylor series">
+
+</a>
+Taylor series for analytic functions  is a common method of evaluation.
+
+
+<p>
+
+<h3>
+<hr>Method 1: simple summation
+</h3>
+If we do not know the required number of terms in advance, we cannot do any better than just evaluate each term and check if it is already small enough.
+Take, for example, the series for $\exp \left( x\right) $.
+To straightforwardly evaluate
+$$\exp \left( x\right) \approx \sum _{k = 0} ^{N - 1} \frac{x ^{k}}{k!} $$
+with $P$ decimal digits of precision and $x &lt; 2$, one would need about $N\approx P \frac{\ln 10}{\ln P} $ terms of the series.
+
+
+<p>
+Divisions by large integers $k!$ and separate evaluations of powers $x ^{k}$ are avoided if we store the previous term.
+The next term can be obtained  by a short division of the previous term by $k$ and a long multiplication by $x$.
+Then we only need $O\left( N\right) $ long multiplications to evaluate the series.
+Usually the required number of terms $N = O\left( P\right) $, so the total cost is $O\left( P M\left( P\right) \right) $.
+
+
+<p>
+There is no accumulation of round-off error in this method if $x$ is small enough (in the case of $\exp \left( x\right) $, a sufficient condition is $\left| x\right|  &lt; \frac{1}{2} $).
+To see this, suppose that $x$ is known to $P$ digits (with relative error $10 ^{ - P}$).
+Since $\left| x\right|  &lt; \frac{1}{2} $, the $n$-th term $\frac{x ^{n}}{n!}  &lt; 4 ^{ - n}$ (this is a rough estimate but it is enough).
+Since each multiplication by $x$ results in adding 1 significant bit of relative round-off error, the relative error of $\frac{x ^{n}}{n!} $ is about $2 ^{n}$ times the relative error of $x$, i.e. $2 ^{n}\cdot 10 ^{ - P}$.
+So the absolute round-off error of $\frac{x ^{n}}{n!} $ is not larger than
+$$\Delta  &lt; 4 ^{ - n}\cdot 2 ^{n}\cdot 10 ^{ - P} = 2 ^{ - n}\cdot 10 ^{ - P}.$$
+Therefore all terms with $n &gt; 1$ contribute less than $10 ^{ - P}$ of absolute round-off error, i.e. less than was originally present in $x$.
+
+
+<p>
+In practice, one could truncate the precision of $\frac{x ^{n}}{n!} $ as $n$ grows, leaving a few guard bits each time to keep the round-off error negligibly small and yet to gain some computation speed.
+This however does not change the asymptotic complexity of the method---it remains $O\left( P M\left( P\right) \right) $.
+
+
+<p>
+However, if $x$ is a small rational number, then the multiplication by $x$ is short and takes $O\left( P\right) $ operations.
+In that case, the total complexity of the method is $O\left( P ^{2}\right) $ which is always faster than $O\left( P M\left( P\right) \right) $.
+
+
+<p>
+
+<h3>
+<hr>Method 2: Horner's scheme
+</h3>
+<a name="Taylor series!by Horner's scheme">
+
+</a>
+<a name="Horner's scheme">
+
+</a>
+Horner's scheme is widely known and consists of the following rearrangement,
+$$\sum _{k = 0} ^{N - 1} a _{k} x ^{k} = a _{0} + x \left( a _{1} + x \left( a _{2} + x \left( \mathrm{ ... } + x a _{N - 1}\right) \right) \right) $$
+The calculation is started from the last coefficient $a _{N - 1}$ toward the first.
+If $x$ is small, then the round-off error generated during the summation is constantly being multiplied by a small number $x$ and thus is always insignificant.
+Even if $x$ is not small or if the coefficients of the series are not small, Horner's scheme usually results in a smaller round-off error than the simple summation.
+
+
+<p>
+If the coefficients $a _{k}$ are related by a simple ratio, then Horner's scheme may be modified to simplify the calculations.
+For example, the Horner scheme for the Taylor series for $\exp \left( x\right) $ may be written as
+$$\sum _{k = 0} ^{N - 1} \frac{x ^{k}}{k!}  = 1 + x \left( 1 + \frac{x}{2}  \left( 1 + \frac{x}{3}  \left( \mathrm{ ... } + \frac{x}{N - 1} \right) \right) \right) .$$
+This avoids computing the factorial function.
+
+
+<p>
+Similarly to the simple summation method, the working precision for Horner's scheme may be adjusted to reduce the computation time: for example, $x a _{N - 1}$ needs to be computed with just a few significant digits if $x$ is small.
+This does not change the asymptotic complexity of the method: it requires $O\left( N\right)  = O\left( P\right) $ long multiplications by $x$, so for general real $x$ the complexity is again $O\left( P M\left( P\right) \right) $.
+However, if $x$ is a small rational number, then the multiplication by $x$ is short and takes $O\left( P\right) $ operations.
+In that case, the total complexity of the method is $O\left( P ^{2}\right) $.
+
+
+<p>
+
+<h3>
+<hr>Method 3: "rectangular" or "baby step/giant step"
+</h3>
+<a name="Taylor series!"rectangular" method">
+
+</a>
+<a name="Taylor series!"baby step/giant step" method">
+
+</a>
+We can organize the calculation much more efficiently if we are able to estimate the necessary number of terms and to afford some storage (see [Smith 1989]).
+
+
+<p>
+The "rectangular" algorithm uses $2 \sqrt{N}$ long multiplications (assuming that the coefficients of the series are short rational numbers) and $\sqrt{N}$ units of storage.
+For high-precision floating-point $x$, this method provides a significant advantage over Horner's scheme.
+
+
+<p>
+Suppose we need to evaluate $\sum _{k = 0} ^{N} a _{k} x ^{k}$ and we know the number of terms $N$ in advance.
+Suppose also that the coefficients $a _{k}$ are rational numbers with small numerators and denominators, so a  multiplication $a _{k} x$ is not a long multiplication (usually, either $a _{k}$ or the ratio $a _{k}$/$a _{k - 1}$ is a short rational number). Then we can organize the calculation in a rectangular array with $c$ columns and $r$ rows like this,
+$$a _{0} + a _{r} x ^{r} + \mathrm{ ... } + a _{\left( c - 1\right)  r} x ^{\left( c - 1\right)  r}+$$
+$$x \left( a _{1} + a _{r + 1} x ^{r} + \mathrm{ ... } + a _{\left( c - 1\right)  r + 1} x ^{\left( c - 1\right)  r}\right) +$$
+$$\mathrm{ ... }+$$
+$$x ^{r - 1} \left( a _{r - 1} + a _{2 r + 1} x ^{r} + \mathrm{ ... }\right) .$$
+To evaluate this rectangle, we first compute $x ^{r}$ (which, if done by the fast
+binary algorithm, requires $O\left( \ln r\right) $ long multiplications). Then we compute
+the $c - 1$ successive powers of $x ^{r}$, namely
+$x ^{2 r}$, $x ^{3 r}$, ..., $x ^{\left( c - 1\right)  r}$ in $c - 1$ long
+multiplications. The partial sums in the $r$ rows are evaluated column by column as more powers of $x ^{r}$ become available. This requires storage of $r$ intermediate results but no more long multiplications by $x$. If a simple formula relating the coefficients $a _{k}$ and $a _{k - 1}$ is available, then a whole column can be computed and added to the accumulated row values using only short operations, e.g. $a _{r + 1} x ^{r}$ can be computed from $a _{r} x ^{r}$ (note that each column contains some consecutive terms of the series). Otherwise, we would need to multiply each coefficient $a _{k}$ separately by the power of $x$; if the coefficients $a _{k}$  are short numbers, this is also a short operation. After this, we need $r - 1$ more
+multiplications for the vertical summation of rows (using the Horner scheme). We have potentially saved time because we do not
+need to evaluate powers such as $x ^{r + 1}$ separately, so we do not have to multiply $x$ by itself quite so many
+times.
+
+
+<p>
+The total required number of long multiplications is $r + c + \ln r - 2$. The minimum number of multiplications, given that $r c\geq N$, is around  $2 \sqrt{N}$ at $r\approx \sqrt{N} - \frac{1}{2} $.
+Therefore, by arranging the Taylor series in a rectangle with sides $r$ and $c$,
+we obtain an algorithm which costs $O\left( \sqrt{N}\right) $ instead of $O\left( N\right) $ long multiplications and requires $\sqrt{N}$ units of storage.
+
+
+<p>
+One might wonder if we should not try to arrange the Taylor series in a cube or another multidimensional matrix instead of a rectangle. However, calculations show that this does not save time: the optimal arrangement is the two-dimensional rectangle.
+
+
+<p>
+The rectangular method saves the number of long multiplications by $x$ but increases the number of short multiplications and additions.
+If $x$ is a small integer or a small rational number, multiplications by $x$ are fast and it does not make sense to use the rectangular method.
+Direct evaluation schemes are more efficient in that case.
+
+
+<p>
+
+<h3>
+<hr>Truncating the working precision
+</h3>
+At the $k$-th step of the rectangular method, we are evaluating the $k$-th column with terms containing $x ^{r k}$.
+Since a power series in $x$ is normally used at small $x$, the number $x ^{r k}$ is typically much smaller than $1$.
+This number is to be multiplied by some $a _{i}$ and added to the previously computed part of each row, which is not small.
+Therefore we do not need all $P$ floating-point digits of the number $x ^{r k}$,
+and the precision with which we obtain it can be gradually decreased from column to column.
+For example, if $x ^{r} &lt; 10 ^{ - M}$, then we only need $P - k M$ decimal digits of $x ^{r k}$ when evaluating the $k$-th column.
+(This assumes that the coefficients $a _{i}$ do not grow, which is the case for most of the practically useful series.)
+
+
+<p>
+Reducing the working precision saves some computation time.
+(We also need to estimate $M$ but this can usually be done quickly by bit counting.)
+Instead of $O\left( \sqrt{P}\right) $ long multiplications at precision $P$, we now need one long multiplication at precision $P$, another long multiplication at precision $P - M$, and so on.
+This technique will not change the asymptotic complexity which remains $O\left( \sqrt{P} M\left( P\right) \right) $, but it will reduce the constant factor in front of the $O$.
+
+
+<p>
+Like the previous two methods, there is no accumulated round-off error if $x$ is small.
+
+
+<p>
+
+<h3>
+<hr>Which method to use
+</h3>
+There are two cases: first, the argument $x$ is a small integer or rational number with very few digits and the result needs to be found as a floating-point number with $P$ digits;
+second, the argument $x$ itself is a floating-point number with $P$ digits.
+
+
+<p>
+In the first case, it is better to use either Horner's scheme (for small $P$, slow multiplication) or the binary splitting technique (for large $P$, fast multiplication).
+The rectangular method is actually <i>slower</i> than Horner's scheme if $x$ and the coefficients $a _{k}$ are small rational numbers.
+In the second case (when $x$ is a floating-point number), it is better to use the "rectangular" algorithm.
+
+
+<p>
+In both cases we need to know the number of terms in advance, as we will have to repeat the whole calculation if a few more terms are needed.
+The simple summation method rarely gives an advantage over Horner's scheme, because it is almost always the case that one can easily compute the number of terms required for any target precision.
+
+
+<p>
+Note that if the argument $x$ is not small, round-off error will become significant and needs to be considered separately for a given series.
+
+
+<p>
+
+<h3>
+<hr>Speed-up for some functions
+</h3>
+<a name="Taylor series!$O\left( \sqrt[3]{N}\right) $ method">
+
+</a>
+An additional speed-up is possible if the function allows a transformation that reduces $x$ and makes the Taylor series converge faster.
+For example, $\ln x = 2 \ln \sqrt{x}$, $\cos 2 x = 2 \left( \cos x\right)  ^{2} - 1$ (bisection), and $\sin 3 x = 3 \sin x - 4 \left( \sin x\right)  ^{3}$ (trisection) are such transformations.
+It may be worthwhile to perform a number of such transformations before evaluating the Taylor series, if the time saved by its quicker convergence is more than the time needed to perform the transformations.
+The optimal number of transformations can be estimated.
+Using this technique in principle reduces the cost of Taylor series from $O\left( \sqrt{N}\right) $ to $O\left( \sqrt[3]{N}\right) $ long multiplications. However, additional round-off error may be introduced by this procedure for some $x$.
+
+
+<p>
+For example, consider the Taylor series for $\sin x$,
+$$\sin x\approx \sum _{k = 0} ^{N - 1} \left(  - 1\right)  ^{k} \frac{x ^{2 k + 1}}{\left( 2 k + 1\right) !} .$$
+It is sufficient to be able to evaluate $\sin x$ for $0 &lt; x &lt; \frac{\pi }{2} $.
+Suppose we perform $l$ steps of the trisection and then use the Taylor series with the rectangular method.
+Each step of the trisection needs two long multiplications.
+The value of $x$ after $l$ trisection steps becomes much smaller, $x' = x\cdot 3 ^{ - l}$.
+For this $x'$, the required number of terms in the Taylor series for $P$ decimal digits of precision is
+$$N\approx \frac{P \ln 10}{2 \left( \ln P - \ln x'\right) }  - 1.$$
+The number of long multiplications in the rectangular method is $2 \sqrt{N}$.
+The total number of long multiplications, as a function of $l$, has its minimum at
+$$l\approx \sqrt[3]{32 \frac{\ln 10}{\ln 3}  P} - \frac{\ln P - \ln x}{\ln 3} ,$$
+where it has a value roughly proportional to $\sqrt[3]{P}$.
+Therefore we shall minimize the total number of long multiplications if we first perform $l$ steps of trisection and then use the rectangular method to compute  $N$ terms of the Taylor series.
+
+
+<p>
+
+<a name="c4s13">
+
+</a>
+<h2>
+<hr>4.13 Using asymptotic series for calculations
+</h2>
+<a name="asymptotic series">
+
+</a>
+Several important analytic functions have asymptotic series expansions.
+For example, the complementary error function $\mathrm{erfc}\, x$ and Euler's Gamma function $\Gamma \left( x\right) $ have the following asymptotic expansions at large (positive) $x$:
+
+
+<p>
+$$\mathrm{erfc}\, x = \frac{e ^{ - x ^{2}}}{x \sqrt{\pi }}  \left( 1 - \frac{1}{2 x ^{2}}  + \mathrm{ ... } + \frac{\left( 2 n - 1\right) !!}{\left(  - 2 x ^{2}\right)  ^{n}}  + \mathrm{ ... }\right) ,$$
+
+
+<p>
+$$\ln \Gamma \left( x\right)  = \left( x - \frac{1}{2} \right)  \ln x - x + \frac{\ln 2 \pi }{2} $$
+$$ + \sum _{n = 1} ^{\infty } \frac{B _{2 n}}{2 n \left( 2 n - 1\right)  x ^{2 n - 1}} $$
+(here $B _{k}$ are Bernoulli numbers).
+
+
+<p>
+The above series expansions are asymptotic in the following sense:
+if we truncate the series and then take the limit of very large $x$,
+then the difference between the two sides of the equation goes to zero.
+
+
+<p>
+It is important that the series be first truncated and then the limit of large $x$ be taken.
+Usually, an asymptotic series, if taken as an infinite series,
+does not actually converge for any finite $x$.
+This can be seen in the examples above.
+For instance, in the asymptotic series for $\mathrm{erfc}\, x$ the $n$-th term has $\left( 2 n - 1\right) !!$ in the numerator which grows faster than the $n$-th power of any number.
+The terms of the series decrease at first but then eventually start to grow,
+even if we select a large value of $x$.
+
+
+<p>
+The way to use an
+asymptotic series for a numerical calculation is to truncate the series
+<i>well before</i> the terms start to grow.
+
+
+<p>
+Error estimates of the asymptotic series are sometimes difficult, but the rule of thumb seems to be that the error of the
+approximation is usually not greater than the first discarded term of the series.
+This can be understood intuitively as follows.
+Suppose we truncate the asymptotic series at a point where the terms still decrease, safely before they start to grow.
+For example, let the terms around the 100-th term be $A _{100}$, $A _{101}$, $A _{102}$, ...,
+each of these numbers being significantly smaller than the previous one,
+and suppose we retain $A _{100}$ but drop the terms after it.
+Then our approximation would have been a lot better if we retained $A _{101}$ as well.
+(This step of the argument is really an assumption about the behavior of the series; it seems that this assumption is correct in many practically important cases.)
+Therefore the error of the approximation is approximately equal to $A _{101}$.
+
+
+<p>
+The inherent limitation of the method of asymptotic series is that for any given
+$x$, there will be a certain place in the series where the term has the minimum
+absolute value (after that, the series is unusable), and the error of the
+approximation cannot be smaller than that term.
+
+
+<p>
+
+<a name="error function $\mathrm{erf}\, x$!by asymptotic series ">
+
+</a>
+<a name="asymptotic series!estimate of precision">
+
+</a>
+For example, take the above asymptotic series for $\mathrm{erfc}\, x$.
+The logarithm of the absolute value of the $n$-th term can be estimated using Stirling's formula for the factorial as
+$$\ln \frac{\left( 2 n - 1\right) !!}{\left( 2 x ^{2}\right)  ^{n}} \approx n \left( \ln n - 1 - 2 \ln x\right) .$$
+This function of $n$ has its minimum at $n = x ^{2}$ where it is equal to $ - x ^{2}$.
+Therefore the best we can do with this series is to truncate it before this term.
+The resulting approximation to $\mathrm{erfc}\, x$ will have relative precision of order $\exp \left(  - x ^{2}\right) $.
+Suppose that $x$ is large and we need to compute $\mathrm{erfc}\, x$ with $P$ decimal digits of floating point.
+Then it follows that we can use the asymptotic series only if $x &gt; \sqrt{P \ln 10}$.
+
+
+<p>
+We find that for a given finite $x$, no matter how large, there is a maximum
+precision that can be achieved with the asymptotic series; if we need more
+precision, we have to use a different method.
+
+
+<p>
+However, sometimes the function we are evaluating allows identity transformations that relate $f\left( x\right) $ to $f\left( y\right) $ with $y &gt; x$.
+For example, the Gamma function satisfies $x \Gamma \left( x\right)  = \Gamma \left( x + 1\right) $.
+In this case we can transform the function so that we would need to
+evaluate it at  large enough $x$ for the asymptotic series to give us
+enough precision.
+
+
+<p>
+
+<a name="c4s14">
+
+</a>
+<h2>
+<hr>4.14 The AGM sequence algorithms
+</h2>
+<a name="AGM sequence">
+
+</a>
+Several algorithms are based on the arithmetic-geometric mean (AGM)
+sequence. If one takes two numbers $a$, $b$ and computes their arithmetic
+mean $\frac{a + b}{2} $ and their geometric mean $\sqrt{a b}$, then one finds that the two means
+are generally much closer to each other than the original numbers. Repeating
+this process creates a rapidly converging sequence of pairs.
+
+
+<p>
+More formally, one can define the function of two
+arguments $\mathrm{ AGM }\left( x, y\right) $ as the limit of the sequence $a _{k}$ where
+$a _{k + 1} = \frac{1}{2}  \left( a _{k} + b _{k}\right) $, $b _{k + 1} = \sqrt{a _{k} b _{k}}$, and the initial values
+are $a _{0} = x$, $b _{0} = y$. (The limit of the sequence $b _{k}$ is the same.)
+This function is obviously linear, $\mathrm{ AGM }\left( c x, c y\right)  = c \mathrm{ AGM }\left( x, y\right) $, so in
+principle it is enough to compute $\mathrm{ AGM }\left( 1, x\right) $ or arbitrarily select $c$ for convenience.
+
+
+<p>
+
+<a name="AGM sequence!integral representation">
+
+</a>
+Gauss and Legendre knew that
+the limit of the AGM sequence is related to the complete elliptic integral,
+$$\frac{\pi }{2}  \frac{1}{\mathrm{ AGM }\left( a, \sqrt{a ^{2} - b ^{2}}\right) }  = \int _{0} ^{\frac{\pi }{2}  } \frac{1}{\sqrt{a ^{2} - b ^{2} \left( \sin x\right)  ^{2}}}  dx.$$
+(Here $0 &lt; b &lt; a$.) This integral can be rearranged to provide some other useful functions. For
+example, with suitable parameters $a$ and $b$, this integral is equal to
+$\pi $.
+Thus, one obtains a fast method of computing $\pi $ (the Brent-Salamin method).
+
+
+<p>
+The AGM sequence is also defined for complex values $a$, $b$.
+One needs to take a square root $\sqrt{a b}$, which requires a branch cut to be well-defined.
+Selecting the natural cut along the negative real semiaxis ($Re\left( x\right)  &lt; 0$, $Im\left( x\right)  = 0$), we obtain an AGM sequence that converges for any initial values $x$, $y$ with positive real part.
+
+
+<p>
+
+<a name="AGM sequence!convergence rate">
+
+</a>
+Let us estimate the convergence rate of the AGM sequence starting from $x$, $y$, following the paper [Brent 1975]. Clearly the worst case is when
+the numbers $x$ and $y$ are very different (one is much larger than another). In this case
+the numbers $a _{k}$, $b _{k}$ become approximately equal after about
+$k = \frac{1}{\ln 2}  \ln \left| \ln \frac{x}{y} \right| $ iterations (note: Brent's paper online mistypes
+this as $\frac{1}{\ln 2}  \left| \ln \frac{x}{y} \right| $).
+This is easy to see: if $x$ is much larger than $y$, then at each step the ratio $r\equiv \frac{x}{y} $ is transformed into $r' = \frac{1}{2}  \sqrt{r}$.
+When the two numbers become roughly equal to each other, one needs about $\frac{\ln n}{\ln 2} $ more
+iterations to make the first $n$ (decimal) digits of $a _{k}$ and $b _{k}$
+coincide, because the relative error $\epsilon  = 1 - \frac{b}{a} $ decays approximately as
+$\epsilon  _{k}\approx \frac{1}{8}  \exp \left(  - 2 ^{k}\right) $.
+
+
+<p>
+Unlike Newton's iteration, the AGM sequence does not correct errors, so all numbers need to be computed with full precision.
+Actually, slightly more precision is needed to compensate for accumulated round-off error.
+Brent (in [Brent 1975]) says that $O\left( \ln \ln n\right) $ bits of accuracy are lost to round-off error if there are total of $n$ iterations.
+
+
+<p>
+The AGM sequence can be used for fast computations of $\pi $, $\ln x$ and $\arctan x$.
+However, currently the limitations of Yacas internal math make these methods less efficient than simpler methods based on Taylor series and Newton iterations.
+
+
+<p>
+
+<a name="c4s15">
+
+</a>
+<h2>
+<hr>4.15 The binary splitting method
+</h2>
+<a name="binary splitting">
+
+</a>
+The method of binary splitting is well explained in [Haible <i>et al.</i> 1998].
+Some examples are also given in [Gourdon <i>et al.</i> 2001].
+This method applies to power series of rational numbers and to hypergeometric series.
+Most series for transcendental functions belong to this category.
+
+
+<p>
+If we need to take $O\left( P\right) $ terms of the series to obtain $P$ digits of precision, then ordinary methods would require $O\left( P ^{2}\right) $ arithmetic operations.
+(Each term needs $O\left( P\right) $ operations because all coefficients are rational numbers with $O\left( P\right) $ digits and we need to perform a few short multiplications or divisions.)
+The binary splitting method requires $O\left( M\left( P \ln P\right)  \ln P\right) $ operations instead of the $O\left( P ^{2}\right) $ operations.
+In other words, we need to perform long multiplications of integers of size $O\left( P \ln P\right) $ digits, but we need only $O\left( \ln P\right) $ such multiplications.
+The binary splitting method performs better than the straightforward summation method if the cost of multiplication is lower than $\frac{O\left( P ^{2}\right) }{\ln P} $.
+This is usually true only for large enough precision (at least a thousand digits).
+
+
+<p>
+Thus there are two main limitations of the binary splitting method:
+<ul><li>As a rule, we can only compute functions of small integer or rational arguments.
+For instance, the method works for the calculation of a Bessel function </li>$J_{0}\left( \frac{1}{3} \right) $ but not for $J_{0}\left( \pi \right) $.
+(As an exception, certain elementary functions <i>can</i> be computed by the binary splitting method for general floating-point arguments, with some clever tricks.)
+<li>The method is fast only at high enough precision, when advanced multiplication methods become more efficient than simple </li>$O\left( P ^{2}\right) $ methods.
+The binary splitting method is actually <i>slower</i> than the simple summation when the long integer multiplication is $M\left( P\right)  = O\left( P ^{2}\right) $.
+</ul>
+
+<p>
+The main advantages of the method are:
+<ul><li>The method is asymptotically fast and, when applicable, outperforms most other methods at very high precision.
+The best applications of this method are for computing various constants.
+</li><li>There is no accumulated round-off error since the method uses only exact integer arithmetic.
+</li><li>The sum of a long series can be split into many independent partial sums which can be computed in parallel.
+One can store exact intermediate results of a partial summation (a few long integers), which provides straightforward checkpointing: a failed partial summation can be repeated without repeating all other parts.
+One can also resume the summation later to get more precision and reuse the old results, instead of starting all over again.
+</li></ul>
+
+<p>
+
+<h3>
+<hr>Description of the method
+</h3>
+We follow [Haible <i>et al.</i> 1998].
+The method applies to any series of rational numbers of the form
+$$S = \sum _{n = 0} ^{N - 1} \frac{A\left( n\right) }{B\left( n\right) } ,$$
+where $A$, $B$ are integer coefficients with $O\left( n \ln n\right) $ bits.
+Usually the series is of the particular form
+$$S\left( 0, N\right) \equiv \sum _{n = 0} ^{N - 1} \frac{a\left( n\right) }{b\left( n\right) }  \frac{p\left( 0\right)  \mathrm{ ... } p\left( n\right) }{q\left( 0\right)  \mathrm{ ... } q\left( n\right) } ,$$
+where $a$, $b$, $p$, $q$ are polynomials in $n$ with small integer coefficients and values that fit into $O\left( \ln n\right) $ bits.
+
+
+<p>
+For example, the Taylor series for $\arcsin x$ (when $x$ is a short rational number) is of this form:
+$$\arcsin x = x + \frac{1}{2}  \frac{x ^{3}}{3}  + \frac{1\cdot 3}{2\cdot 4}  \frac{x ^{5}}{5}  + \frac{1\cdot 3\cdot 5}{2\cdot 4\cdot 6}  \frac{x ^{7}}{7}  + \mathrm{ ... }$$
+This example is of the above form with the definitions $a = 1$, $b\left( n\right)  = 2 n + 1$, $p\left( n\right)  = x ^{2} \left( 2 n - 1\right) $, $q\left( n\right)  = 2 n$ for $n\geq 1$ and $p\left( 0\right)  = x$, $q\left( 0\right)  = 1$.
+(The method will apply only if $x$ is a rational number with $O\left( \ln N\right) $ bits in the numerator and the denominator.)
+The Taylor series for the hypergeometric function is also of this form.
+
+
+<p>
+The goal is to compute the sum $S\left( 0, N\right) $ with a chosen number of terms $N$.
+Instead of computing the rational number $S$ directly, the binary splitting method propose to compute the following four integers $P$, $Q$, $B$, and $T$:
+$$P\left( 0, N\right) \equiv p\left( 0\right)  \mathrm{ ... } p\left( N - 1\right) ,$$
+$$Q\left( 0, N\right) \equiv q\left( 0\right)  \mathrm{ ... } q\left( N - 1\right) ,$$
+$$B\left( 0, N\right) \equiv b\left( 0\right)  \mathrm{ ... } b\left( N - 1\right) ,$$ and
+$$T\left( 0, N\right) \equiv B\left( 0, N\right)  Q\left( 0, N\right)  S\left( 0, N\right) .$$
+At first sight it seems difficult to compute $T$, but the computation is organized recursively.
+These four integers are computed for the left ($l$) half and for the right ($r$) half of the range [$0$, $N$) and then combined using the obvious recurrence relations $P = P _{l} P _{r}$, $Q = Q _{l} Q _{r}$, $B = B _{l} B _{r}$, and the slightly less obvious relation
+$$T = B _{r} Q _{r} T _{l} + B _{l} P _{l} T _{r}.$$
+Here we used the shorthand $P _{l}\equiv P\left( 0, \frac{N}{2}  - 1\right) $, $P _{r}\equiv P\left( \frac{N}{2} , N - 1\right) $ and so on.
+
+
+<p>
+Thus the range [$0$, $N$) is split in half on each step.
+At the base of recursion the four integers $P$, $Q$, $B$, and $T$ are computed directly.
+At the end of the calculation (top level of recursion), one floating-point division is performed to recover $S = \frac{T}{B Q} $.
+It is clear that the four integers carry the full information needed to continue the calculation with more terms.
+So this algorithm is easy to checkpoint and parallelize.
+
+
+<p>
+The integers $P$, $Q$, $B$, and $T$ grow during the calculation to $O\left( N \ln N\right) $ bits, and we need to multiply these large integers.
+However, there are only $O\left( \ln N\right) $ steps of recursion and therefore $O\left( \ln N\right) $
+long multiplications are needed.
+If the series converges linearly, we need $N = O\left( P\right) $ terms to obtain $P$ digits of precision.
+Therefore, the total asymptotic cost of the method is $O\left( M\left( P \ln P\right)  \ln P\right) $ operations.
+
+
+<p>
+A more general form of the binary splitting technique is also given in [Haible <i>et al.</i> 1998].
+The generalization applies to series for the form
+$$\sum _{n = 0} ^{N - 1} \frac{a\left( n\right) }{b\left( n\right) }  \frac{p\left( 0\right)  \mathrm{ ... } p\left( n\right) }{q\left( 0\right)  \mathrm{ ... } q\left( n\right) }  \left( \frac{c\left( 0\right) }{d\left( 0\right) }  + \mathrm{ ... } + \frac{c\left( n\right) }{d\left( n\right) } \right) ,$$
+Here $a\left( n\right) $, $b\left( n\right) $, $c\left( n\right) $, $d\left( n\right) $, $p\left( n\right) $, $q\left( n\right) $ are integer-valued functions with "short" values of size $O\left( \ln n\right) $ bits.
+For example, the Ramanujan series for Catalan's constant is of this form.
+
+
+<p>
+The binary splitting technique can also be used for series with complex integer coefficients, or more generally for coefficients in any finite algebraic extension of integers, e.q. $Z$[$\sqrt{2}$] (the ring of numbers of the form $p + q \sqrt{2}$ where $p$, $q$ are integers).
+Thus we may compute the Bessel function $J_{0}\left( \sqrt{3}\right) $ using the binary splitting method and obtain exact intermediate results of the form $p + q \sqrt{3}$.
+But this will still not help compute $J_{0}\left( \pi \right) $.
+This is a genuine limitation of the binary splitting method.
+
+
+<p>
+
+
+<script src="http://www.google-analytics.com/urchin.js" type="text/javascript">
+</script>
+<script type="text/javascript">
+_uacct = "UA-2425144-1";
+urchinTracker();
+</script>
+</body>
+
+</html>

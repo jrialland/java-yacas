@@ -1,0 +1,2018 @@
+<html>
+<head>
+  <title>Numerical algorithms II: elementary functions</title>
+  <link rel="stylesheet" href="yacas.css" TYPE="text/css" MEDIA="screen">
+  <script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
+    });
+  </script>
+  <script type="text/javascript"
+    src="https://c328740.ssl.cf1.rackcdn.com/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+</head>
+<body>
+<a name="c5">
+
+</a>
+<h1>
+5. Numerical algorithms II: elementary functions
+</h1>
+<p> </p>
+<a name="c5s1">
+
+</a>
+<h2>
+<hr>5.1 Powers
+</h2>
+<a name="powers">
+
+</a>
+There are two computational tasks:
+to compute the power $x ^{n}$ where $n$ is an integer (but $x$ may be a real or a complex number),
+and compute $x ^{y}$ for arbitrary (real or complex) $x$, $y$.
+We assume that $x$, $y$, $n$ are "big" numbers with $P$ significant digits.
+
+
+<p>
+We also assume that the power is positive, or else we need to perform an additional division to obtain $x ^{ - y} = \frac{1}{x ^{y}} $.
+
+
+<p>
+If $x\neq 0$ is known to a relative precision $\epsilon $, then $x ^{y}$ has the relative precision $\epsilon  y$.
+This means a loss of precision if $\left| y\right|  &gt; 1$ and an improvement of precision otherwise.
+
+
+<p>
+
+<h3>
+<hr>Integer powers
+</h3>
+<a name="powers!by repeated squaring">
+
+</a>
+Integer powers $x ^{n}$ with integer $n$ are computed by a fast algorithm of "repeated squaring".
+This algorithm is well known (see, for example,
+the famous book, <i>The art of computer programming</i> [Knuth 1973]).
+
+
+<p>
+The
+algorithm is based on the following trick: if $n$ is even, say $n = 2 k$, then
+$x ^{n} = \left( x ^{k}\right)  ^{2}$; and if $n$ is odd, $n = 2 k + 1$, then $x ^{n} = x \left( x ^{k}\right)  ^{2}$. Thus we can
+reduce the calculation of $x ^{n}$ to the calculation of $x ^{k}$ with $k\leq \frac{n}{2} $,
+using at most two long multiplications.
+This reduction is one step of the algorithm; at each step $n$ is reduced to at most half.
+This algorithm stops when $n$ becomes 1,
+which happens after $m$ steps where $m$ is the number of bits in $n$.
+So the total number of long multiplications is at most $2 m = \frac{2 \ln n}{\ln 2} $.
+More precisely, it is equal to $m$ plus the number of nonzero bits in the binary representation of $n$.
+On the average, we shall have $\frac{3}{2}  \frac{\ln n}{\ln 2} $ long multiplications.
+The computational cost of the algorithm is therefore $O\left( M\left( P\right)  \ln n\right) $.
+This should be compared with e.g. the cost of the best method for $\ln x$ which is $O\left( P M\left( P\right) \right) $.
+
+
+<p>
+The outlined procedure is most easily implemented using recursive calls.
+The depth of recursion is of order $\ln n$ and should be manageable for most real-life applications.
+The Yacas code would look like this:
+<table cellpadding="0" width="100%">
+<tr><td width=100% bgcolor="#DDDDEE"><pre>
+10# power(_x,1)&lt;--x;
+20# power(_x,n_IsEven)&lt;-- power(x,n&gt;&gt;1)^2;
+30# power(_x,n_IsOdd)&lt;--x*power(x,n&gt;&gt;1)^2;
+</pre></tr>
+</table>
+The function <b><tt>power(m,n)</tt></b> calculates the result of $m ^{n}$ for $n &gt; 0$, $m &gt; 0$,
+integer $n$ and integer $m$.
+The bit shifts and the check for an odd number are very fast operations if the internal representation of big numbers uses base $2$.
+
+
+<p>
+If we wanted to avoid recursion with its overhead,
+we would have to obtain the bits of the number $n$ in reverse order.
+This is possible but is somewhat cumbersome unless we store the bits in an array.
+
+
+<p>
+
+<a name="powers!by repeated squaring!non-recursive">
+
+</a>
+It is easier to implement the non-recursive version of the squaring algorithm in a slightly different form.
+Suppose we obtain the bits $b _{i}$ of the number $n$ in the usual order, so that $n = b _{0} + 2 b _{1} + \mathrm{ ... } + b _{m}\cdot 2 ^{m}$.
+Then we can express the power $x ^{n}$ as
+$$x ^{n} = x ^{b _{0}} \left( x ^{2}\right)  ^{b _{1}} \mathrm{ ... } \left( x ^{2 ^{m}}\right)  ^{b _{m}}.$$
+In other words, we evaluate $x ^{2}$, $x ^{4}$, ... by repeated squaring, select those $x ^{2 ^{k}}$ for which the $k$-th bit $b _{k}$ of the number $n$ is nonzero, and multiply all selected powers together.
+
+
+<p>
+In the Yacas script form, the algorithm looks like this:
+
+
+<p>
+<table cellpadding="0" width="100%">
+<tr><td width=100% bgcolor="#DDDDEE"><pre>
+power(x_IsPositiveInteger,n_IsPositiveInteger)&lt;--
+[
+  Local(result, p);
+  result:=1;
+  p := x;
+  While(n != 0)
+  [ // at step k, p = x^(2^k)
+    if (IsOdd(n))
+      result := result*p;
+    p := p*p;
+    n := n&gt;&gt;1;
+  ];
+  result;
+];
+</pre></tr>
+</table>
+
+
+<p>
+
+<a name="powers!modular">
+
+</a>
+The same algorithm can be used to obtain a power of an integer modulo another integer, $x ^{n}\bmod M$, if we replace the multiplication <b><tt>p*p</tt></b> by a modular multiplication, such as <b><tt>p:=Mod(p*p,M)</tt></b>.
+Since the remainder modulo $m$ would be computed at each step, the results do not grow beyond $M$.
+This allows to efficiently compute even extremely large modular powers of integers.
+
+
+<p>
+
+<a name="IntPowerNum@\relax <b><tt>IntPowerNum</tt></b>">
+
+</a>
+Matrix multiplication, or, more generally, multiplication in any given ring, can be substituted into the algorithm instead of the normal multiplication.
+The function <b><tt>IntPowerNum</tt></b> encapsulates the computation of the $n$-th power of an expression using the binary squaring algorithm.
+
+
+<p>
+
+<a name="powers!by repeated squaring!improvements">
+
+</a>
+The squaring algorithm can be improved a little bit if we are willing to use recursion or to obtain the bits of $n$ in the reverse order.
+(This was suggested in the exercise 4.21 in the book
+[von zur Gathen <i>et al.</i> 1999].)
+Let us represent the power $n$ in base $4$ instead of base $2$.
+If $q _{k}$ are the digits of $n$ in base $4$, then we can express
+$$x ^{n} = x ^{q _{0}} \left( x ^{4}\right)  ^{q _{1}} \mathrm{ ... } \left( x ^{4 ^{m}}\right)  ^{q _{m}}.$$
+We shall compute this expression from right to left: first we compute $x ^{q _{m}}$.
+This is a small power because $q _{m}$ is a digit in base $4$, an integer between $0$ and $3$.
+Then we raise it to the $4$th power and multiply by $x ^{q _{m - 1}}$.
+We repeat this process until we reach the $0$th digit of $n$.
+At each step we would need to multiply at most three times.
+Since each of the $q _{k}$ is between $0$ and $3$, we would need to precompute $x ^{2}$ and $x ^{3}$ which requires one extra multiplication ($x ^{2}$ would be computed anyway).
+Therefore the total number of long multiplications is in the worst case $3 \frac{\ln n}{\ln 4}  + 1$.
+This is about 25<b><tt>%</tt></b> better than the previous worst-case result, $2 \frac{\ln n}{\ln 2} $.
+However, the average-case improvement is only about 8<b><tt>%</tt></b> because the average number of multiplications in the base-$4$ method is $\frac{11}{4}  \frac{\ln n}{\ln 4} $.
+
+
+<p>
+We might then use the base $8$ instead of $4$ and obtain a further small improvement.
+(Using bases other than powers of $2$ is less efficient.)
+But the small gain in speed probably does not justify the increased complexity of the algorithm.
+
+
+<p>
+
+<h3>
+<hr>Real powers
+</h3>
+<a name="powers!real numbers">
+
+</a>
+The squaring algorithm can be used to obtain integer powers $x ^{n}$ in any ring---as long as $n$ is an integer, $x$ can be anything from a complex number to a matrix. But for a general real number $n$, there is no such trick and the power $x ^{n}$ has to be computed through the logarithm and the exponential function, $x ^{n} = \exp \left( n \ln x\right) $.
+(This also covers the case when $x$ is negative and the result is a complex number.)
+
+
+<p>
+An exceptional case is when $n$ is a rational number with a very small numerator and denominator, for example, $n = \frac{2}{3} $.
+In this case it is faster to take the square of the cubic root of $x$.
+(See the section on the computation of roots below.)
+Then the case of negative $x$ should be handled separately.
+This speedup is not implemented in Yacas.
+
+
+<p>
+Note that the relative precision changes when taking powers.
+If $x$ is known to relative precision $\epsilon $, i.e. $x$ represents a real number that could be $x \left( 1 + \epsilon \right) $, then $x ^{2}\approx x \left( 1 + 2 \epsilon \right) $ has relative precision $2 \epsilon $, while $\sqrt{x}$ has relative precision $\frac{\epsilon }{2} $.
+So if we square a number $x$, we lose one significant bit of $x$, and when we take a square root of $x$, we gain one significant bit.
+
+
+<p>
+
+<a name="c5s2">
+
+</a>
+<h2>
+<hr>5.2 Roots
+</h2>
+Computation of roots $r = \sqrt[n]{x}$ is efficient when $n$ is a small integer.
+The basic approach is to numerically solve the equation $r ^{n} = x$.
+
+
+<p>
+Note that the relative precision is improved after taking a root with $n &gt; 1$.
+
+
+<p>
+
+<h3>
+<hr>Method 1: bisection
+</h3>
+<a name="roots!by bisection algorithm">
+
+</a>
+The square root can be computed by using the bisection method, which
+works well for integers (if only the integer part of the square root is needed).
+The algorithm is described in [Johnson 1987].
+The general approach is to scan
+each bit of the input number and to see if a certain bit should be set in the resulting integer.
+The time is linear in the number of decimals, or logarithmic in
+the input number. The method is very similar in approach to the
+repeated squaring method described above for raising numbers to a
+power.
+
+
+<p>
+For integer $N$, the following steps are performed:
+
+
+<p>
+<ul><li>Find the highest bit set, </li>$l_{2}$, in the number $N$.
+<li></li>$1&lt;&lt;\left( \frac{l_{2}}{2} \right) $ is definitely a bit that is set in the result.
+Start by setting that bit in the result, $u = 1&lt;&lt;l_{2}$.
+It is also the highest bit set in the result.
+<li>Now, traverse all the lower bits, one by one. For each lower
+bit, starting at </li>$\mathrm{ lnext } = l_{2} - 1$, set $v = 1&lt;&lt;\mathrm{ lnext }$. Now, 
+$\left( u + v\right)  ^{2} = u ^{2} + 2 u v + v ^{2}$. If $\left( u + v\right)  ^{2}\leq N$, then the bit set
+in $v$ should also be set in the result, $u$, otherwise that bit should 
+be cleared.
+<li>Set </li>$\mathrm{ lnext } = \mathrm{ lnext } - 1$, and repeat until all bits are tested, 
+and $\mathrm{ lnext } = 0$ and return the result found.
+</ul>
+
+<p>
+The intermediate results, $u ^{2}$, $v ^{2}$ and $2 u v$ can be 
+maintained easily too, due to the nature of the numbers 
+involved ($v$ having only one bit set, and it being known which bit that
+is).
+
+
+<p>
+For floating point numbers, first the required number of decimals $p$ after
+the decimal point is determined. Then the input number $N$ is
+multiplied by a power of 10 until it has $2 p$ decimal. Then the integer square root calculation
+is performed, and the resulting number has $p$ digits of precision.
+
+
+<p>
+Below is some <b><tt>Yacas</tt></b> script code to perform the calculation for integers.
+
+
+<p>
+<table cellpadding="0" width="100%">
+<tr><td width=100% bgcolor="#DDDDEE"><pre>
+//sqrt(1) = 1, sqrt(0) = 0
+10 # BisectSqrt(0) &lt;-- 0;
+10 # BisectSqrt(1) &lt;-- 1;
+
+20 # BisectSqrt(N_IsPositiveInteger) &lt;--
+[
+  Local(l2,u,v,u2,v2,uv2,n);
+
+  // Find highest set bit, l2
+  u  := N;
+  l2 := 0;
+  While (u!=0)
+  [
+    u:=u&gt;&gt;1;
+    l2++;
+  ];
+  l2--;
+
+  // 1&lt;&lt;(l2/2) now would be a good under estimate 
+  // for the square root. 1&lt;&lt;(l2/2) is definitely 
+  // set in the result. Also it is the highest
+  // set bit.
+  l2 := l2&gt;&gt;1;
+
+  // initialize u and u2 (u2==u^2).
+  u  := 1 &lt;&lt; l2;
+  u2 := u &lt;&lt; l2;
+
+  // Now for each lower bit:
+  While( l2 != 0 )
+  [
+	l2--;
+     // Get that bit in v, and v2 == v^2.
+      v  := 1&lt;&lt;l2;
+      v2 := v&lt;&lt;l2;
+
+      // uv2 == 2*u*v, where 2==1&lt;&lt;1, and 
+      // v==1&lt;&lt;l2, thus 2*u*v == 
+      // (1&lt;&lt;1)*u*(1&lt;&lt;l2) == u&lt;&lt;(l2+1)
+      uv2 := u&lt;&lt;(l2 + 1);
+
+      // n = (u+v)^2  = u^2 + 2*u*v + v^2 
+      //   = u2+uv2+v2
+      n := u2 + uv2 + v2;
+
+      // if n (possible new best estimate for 
+      // sqrt(N)^2 is smaller than N, then the 
+      // bit l2 is set in the result, and 
+      // add v to u.
+      if( n &lt;= N )
+      [
+        u  := u+v;  // u &lt;- u+v
+        u2 := n;    // u^2 &lt;- u^2 + 2*u*v + v^2
+      ];
+      l2--;
+    ];
+    u; // return result, accumulated in u.
+];
+</pre></tr>
+</table>
+<b><tt>BisectSqrt(N)</tt></b> computes the integer part of $\sqrt{N}$ for integer $N$.
+(If we need to obtain more digits, we should first multiply $N$ by a suitable power of $2$.)
+The algorithm works for floats as well as for integers.
+
+
+<p>
+The bisection algorithm uses only additions and bit shifting operations.
+Suppose the integer $N$ has $P$ decimal digits, then it has $n = P \frac{\ln 10}{\ln 2} $ bits.
+For each bit, the number of additions is about $4$.
+Since the cost of an addition is linear in the number of bits, the total complexity of the bisection method is roughly $4 n ^{2} = O\left( P ^{2}\right) $.
+
+
+<p>
+
+<h3>
+<hr>Method 2: Newton's iteration
+</h3>
+<a name="roots!by Newton's method">
+
+</a>
+An efficient method for computing the square root is found by using Newton's iteration for the equation $r ^{2} - x = 0$.
+The initial value of $r$ can be obtained by bit counting and shifting, as in the bisection method.
+The iteration formula is
+$$r' = \frac{r}{2}  + \frac{x}{2 r} .$$
+The convergence is quadratic, so we double the number of correct digits at each step.
+Therefore, if the initial guess is accurate to one bit, the number of steps $n$ needed to obtain $P$ decimal digits is
+$$n = \frac{\ln P \frac{\ln 10}{\ln 2} }{\ln 2}  = O\left( \ln P\right) .$$
+We need to perform one long division at each step; a long division costs $O\left( M\left( P\right) \right) $.
+Therefore the total complexity of this algorithm is $O\left( M\left( P\right)  \ln P\right) $.
+This is better than the $O\left( P ^{2}\right) $ algorithm if the cost of multiplication is below $O\left( P ^{2}\right) $.
+
+
+<p>
+In most implementations of arbitrary-precision arithmetic, the time to perform a long division is several times that of a long multiplication.
+Therefore it makes sense to use a method that avoids divisions.
+One variant of Newton's method is to solve the equation
+$\frac{1}{r ^{2}}  = x$.
+The solution of this equation $r = \frac{1}{\sqrt{x}} $ is the limit of the iteration $$r' = r + r \frac{1 - r ^{2} x}{2} $$
+that does not require any divisions (but instead requires three multiplications).
+The final multiplication $r x$ completes the calculation of the square root.
+
+
+<p>
+As usual with Newton's method, all errors are automatically corrected, so the working precision can be gradually increased until the last iteration.
+The full precision of $P$ digits is used only at the last iteration; the last-but-one iteration uses $\frac{P}{2} $ digits and so on.
+
+
+<p>
+An optimization trick is to combine the multiplication by $x$ with the last iteration.
+Then computations can be organized in a special way to avoid the last full-precision multiplication.
+(This is described in [Karp <i>et al.</i> 1997] where the same trick is also applied to Newton's iteration for division.)
+
+
+<p>
+The idea is the following: let $r$ be the $P$-digit approximation to $\frac{1}{\sqrt{x}} $ at the beginning of the last iteration.
+(In this notation, $2 P$ is the precision of the final result, so $x$ is also known to about $2 P$ digits.)
+The unmodified procedure would have run as follows:
+$$r' = r + r \frac{1 - r ^{2} x}{2} ,$$
+$$s = x r'.$$
+Then $s$ would have been the final result, $\sqrt{x}$ to $2 P$ digits.
+We would need one multiplication $M\left( P\right) $ with $2 P$-digit result to compute $r ^{2}$, then one $M\left( 2 P\right) $ to compute $r ^{2} x$ (the product of a $P$-digit $r ^{2}$ and a $2 P$-digit $x$).
+Then we subtract this from $1$ and lose $P$ digits since $r$ was already a $P$-digit approximation to $\frac{1}{\sqrt{x}} $.
+The value $y\equiv 1 - r ^{2} x$ is of order $10 ^{ - P}$ and has $P$ significant digits.
+So the third multiplication, $r y$, is only $M\left( P\right) $.
+The fourth multiplication $s x$ is again $M\left( 2 P\right) $.
+The total cost is then $2 M\left( P\right)  + 2 M\left( 2 P\right) $.
+
+
+<p>
+Now consider Newton's iteration for $s\approx \sqrt{x}$,
+$$s' = s + \frac{1}{s}  \frac{1 - s ^{2} x}{2} .$$
+The only reason we are trying to avoid it is the division by $s$.
+However, after all but the last iterations for $r$ we already have a $P$-digit approximation for $\frac{1}{s} $, which is $r$.
+Therefore we can simply define $s = r x$ and perform the last iteration for $s$, taking $\frac{1}{s} \approx r$.
+This is slightly inexact, but the error is higher-order than the precision of the final result, because Newton's method erases any accumulated errors.
+So this will give us $2 P$ digits of $s$ without divisions, and lower the total computational cost.
+
+
+<p>
+Consider the cost of the last iteration of this combined method.
+First, we compute $s = x r$, but since we only need $P$ correct digits of $s$, we can use only $P$ digits of $x$, so this costs us $M\left( P\right) $.
+Then we compute $s ^{2} x$ which, as before, costs $M\left( P\right)  + M\left( 2 P\right) $, and then we compute $r \left( 1 - s ^{2} x\right) $ which costs only $M\left( P\right) $.
+The total cost is therefore $3 M\left( P\right)  + M\left( 2 P\right) $, so we have traded one multiplication with $2 P$ digits for one multiplication with $P$ digits.
+Since the time of the last iteration dominates the total computing time, this is a significant cost savings.
+For example, if the multiplication is quadratic, $M\left( P\right)  = O\left( P ^{2}\right) $, then this saves about 30<b><tt>%</tt></b> of total execution time; for linear multiplication, the savings is about 16.67<b><tt>%</tt></b>.
+
+
+<p>
+These optimizations do not change the asymptotic complexity of the method, although they do reduce the constant in front of $O\left( \right) $.
+
+
+<p>
+
+<h3>
+<hr>Method 3: argument reduction and interpolation
+</h3>
+<a name="roots!by argument reduction">
+
+</a>
+Before using the bisection or Newton's method, we might apply some argument reduction to speed up the convergence of the iterations and to simplify finding the first approximation.
+
+
+<p>
+Suppose we need to find $\sqrt{x}$.
+Choose an integer $n$ such that $\frac{1}{4}  &lt; x'\equiv 4 ^{ - n} x\leq 1$.
+The value of $n$ is easily found from bit counting: if $b$ is the bit count of $x$, then $$n = \left\lfloor \frac{b + 1}{2} \right\rfloor .$$
+We find
+$$\sqrt{x} = 2 ^{n} \sqrt{x'}.$$
+The precision of $x'$ is the same as that of $x$ since $2 ^{n}$ is an exact number.
+
+
+<p>
+To compute $\sqrt{x'}$, we use Newton's method with the initial value $x' _{0}$ obtained by interpolation of the function $\sqrt{x}$ on the interval [$\frac{1}{4} $,$1$].
+A suitable interpolation function might be taken as simply $\frac{2 x + 1}{3} $ or more precisely
+$$\sqrt{x}\approx \frac{1}{90}  \left(  - 28 x ^{2} + 95 x + 23\right) .$$
+By using a particular interpolation function, we can guarantee a certain number of precise bits at every iteration.
+
+
+<p>
+This may save a few iterations, at the small expense of evaluating the interpolation function once at the beginning.
+However, in computing with high precision the initial iterations are very fast and this argument reduction does not give a significant speed gain.
+But the gain may be important at low precisions, and this technique is sometimes used in microprocessors.
+
+
+<p>
+
+<h3>
+<hr>Method 4: Halley's iteration
+</h3>
+<a name="IntNthRoot@\relax <b><tt>IntNthRoot</tt></b>">
+
+</a>
+<a name="roots!by Halley's method">
+
+</a>
+A separate function <b><tt>IntNthRoot</tt></b> is provided to compute the integer part of $\sqrt[s]{n}$ for integer $n$ and $s$.
+For a given $s$, it evaluates the integer part of $\sqrt[s]{n}$ using only integer arithmetic with integers of size $n ^{1 + \frac{1}{s} }$. This can be done by Halley's iteration method, solving the equation $x ^{s} = n$. For this function, the Halley iteration sequence is monotonic.
+The initial guess is $x _{0} = 2 ^{\frac{b\left( n\right) }{s} }$ where $b\left( n\right) $ is the number of bits in $n$ obtained by bit counting or using the integer logarithm function. It is clear that the initial guess is accurate to within a factor of 2. Since the relative error is squared at every iteration, we need as many iteration steps as bits in $\sqrt[s]{n}$.
+
+
+<p>
+Since we only need the integer part of the root, it is enough to use integer division in the Halley iteration. The sequence $x _{k}$ will monotonically approximate the number $\sqrt[s]{n}$ from below if we start from an initial guess that is less than the exact value. (We start from below so that we have to deal with smaller integers rather than with larger integers.) If $n = p ^{s}$, then after enough iterations the floating-point value of $x _{k}$ would be slightly less than $p$; our value is the integer part of $x _{k}$. Therefore, at each step we check whether $1 + x _{k}$ is a solution of $x ^{s} = n$, in which case we are done; and we also check whether $\left( 1 + x _{k}\right)  ^{s} &gt; n$, in which case the integer part of the root is $x _{k}$.
+To speed up the Halley iteration in the worst case when $s ^{s} &gt; n$, it is combined with bisection. The root bracket interval $x_{1} &lt; x &lt; x_{2}$ is maintained and the next iteration $x _{k + 1}$ is assigned to the midpoint of the interval if Halley's formula does not give sufficiently rapid convergence. The initial root bracket interval can be taken as $x _{0}$, $2 x _{0}$.
+
+
+<p>
+If $s$ is very large ($s ^{s} &gt; n$), the convergence of both Newton's and Halley's iterations is almost linear until the final few iterations.
+Therefore  it is faster to evaluate the floating-point power for large $b$ using the exponential and the logarithm.
+
+
+<p>
+
+<h3>
+<hr>Method 5: higher-order iterations
+</h3>
+<a name="roots!by higher-order methods">
+
+</a>
+A higher-order generalization of Newton's iteration for inverse square root $\frac{1}{\sqrt{x}} $ is:
+$$r' = r + \frac{r}{2}  \left( 1 - r ^{2} x\right)  + 3 \frac{r}{8}  \left( 1 - r ^{2} x\right)  ^{2} + \mathrm{ ... }$$
+The more terms of the series we add, the higher is the convergence rate.
+This is the Taylor series for $\left( 1 - y\right)  ^{ - \frac{1}{2} }$ where $y\equiv 1 - r ^{2} x$.
+If we take the terms up to $y ^{n - 1}$, the precision at the next iteration will be multiplied by $n$.
+The usual second-order iteration (our "method 2") corresponds to $n = 2$.
+
+
+<p>
+The trick of combining the last iteration with the final multiplication by $x$ can be also used with all higher-order schemes.
+
+
+<p>
+Consider the cost of one iteration of $n$-th order.
+Let the initial precision of $r$ be $P$; then the final precision is $k P$ and we use up to $n P$ digits of $x$.
+First we compute $y\equiv 1 - r ^{2} x$ to $P \left( n - 1\right) $ digits, this costs $M\left( P\right) $ for $r ^{2}$ and then $M\left( P n\right) $ for $r ^{2} x$.
+The value of $y$ is of order $10 ^{ - P}$ and it has $P \left( n - 1\right) $ digits, so we only need to use that many digits to multiply it by $r$, and $r y$ now costs us $M\left( P \left( n - 1\right) \right) $.
+To compute $y ^{k}$ (here $2\leq k\leq n - 1$), we need $M\left( P \left( n - k\right) \right) $ digits of $y$; since we need all consecutive powers of $y$, it is best to compute the powers one after another, lowering the precision on the way.
+The cost of computing $r y ^{k} y$ after having computed $r y ^{k}$ is therefore $M\left( P \left( n - k - 1\right) \right) $.
+The total cost of the iteration comes to
+$$2 M\left( P\right)  + M\left( 2 P\right)  + \mathrm{ ... } + M\left( \left( n - 1\right)  P\right)  + M\left( n P\right) .$$
+
+
+<p>
+From the general considerations in the previous chapter (see the section on Newton's method)
+it follows that the optimal order is $n = 2$ and that higher-order schemes are slower in this case.
+
+
+<p>
+
+<h3>
+<hr>Which method to use
+</h3>
+The bisection method (1) for square roots is probably the fastest for small integers or low-precision floats.
+Argument reduction and/or interpolation (3) can be used to simplify the iterative algorithm or to make it more robust.
+
+
+<p>
+Newton's method (2) is best for all other cases: large precision and/or roots other than square roots.
+
+
+<p>
+
+<a name="c5s3">
+
+</a>
+<h2>
+<hr>5.3 Logarithm
+</h2>
+The basic computational task is to obtain the logarithm of a real number.
+However, sometimes only the integer part of the logarithm is needed and the logarithm is taken with respect to an integer base.
+For example, we might need to evaluate the integer part of $\frac{\ln n}{\ln 2} $ where $n$ is a large integer, to find how many bits are needed to hold $n$.
+Computing this "integer logarithm" is a much easier task than computing the logarithm in floating-point.
+
+
+<p>
+Logarithms of complex numbers can be reduced to elementary functions of real numbers, for example:
+$$\ln \left( a + \imath  b\right)  = \frac{1}{2}  \ln \left( a ^{2} + b ^{2}\right)  + \imath  \arctan \frac{b}{a} .$$
+For a negative real number $x &lt; 0$, we have
+$$\ln x = \ln \left| x\right|  + \imath  \pi .$$
+This assumes, of course, an appropriate branch cut for the complex logarithm.
+A natural choice is to cut along the negative real semiaxis, $Im\left( z\right)  = 0$, $Re\left( z\right)  &lt; 0$.
+
+
+<p>
+
+<h3>
+<hr>Integer logarithm
+</h3>
+<a name="logarithm!on integers">
+
+</a>
+The "integer logarithm", defined as the integer part of $\frac{\ln x}{\ln b} $, where $x$ and $b$ are integers, is computed using a special routine <b><tt>IntLog(x,b)</tt></b> with purely integer math.
+When both arguments are integers and only the integer part of the logarithm is needed, the integer logarithm is much faster than evaluating the full floating-point logarithm and truncating the result.
+
+
+<p>
+The basic algorithm consists of (integer-) dividing $x$ by $b$ repeatedly until $x$ becomes $0$ and counting the necessary number of divisions.
+If $x$ has $P$ digits and $b$ and $P$ are small numbers, then division is linear in $P$ and the total number of divisions is $O\left( P\right) $.
+Therefore this algorithm costs $O\left( P ^{2}\right) $ operations.
+
+
+<p>
+A speed-up for large $x$ is achieved by first comparing $x$ with $b$, then with $b ^{2}$, $b ^{4}$, etc., without performing any divisions.
+We perform $n$ such steps until the factor $b ^{2 ^{n}}$ is larger than $x$.
+At this point, $x$ is divided by the previous power of $b$ and the remaining value is iteratively compared with and divided by successively smaller powers of $b$.
+The number of squarings needed to compute $b ^{2 ^{n}}$ is logarithmic in $P$. However, the last few of these multiplications are long multiplications with numbers of length $\frac{P}{4} $, $\frac{P}{2} $, $P$ digits.
+These multiplications take the time $O\left( M\left( P\right) \right) $.
+Then we need to perform another long division and a series of progressively shorter divisions.
+The total cost is still $O\left( M\left( P\right) \right) $.
+For large $P$, the cost of multiplication $M\left( P\right) $ is less than $O\left( P ^{2}\right) $ and therefore this method is preferable. 
+
+
+<p>
+There is one special case, the binary (base $2$) logarithm.
+Since the internal representation of floating-point numbers is usually in binary, the integer part of the binary logarithm can be usually implemented as a constant-time operation.
+
+
+<p>
+
+<h3>
+<hr>Real logarithms
+</h3>
+There are many methods to compute the logarithm of a real number.
+Here we collect these methods and analyze them.
+
+
+<p>
+The logarithm satisfies
+$\ln \frac{1}{x}  =  - \ln x$.
+Therefore we need to consider only $x &gt; 1$, or alternatively, only $0 &lt; x &lt; 1$.
+
+
+<p>
+
+<a name="logarithm!precision">
+
+</a>
+Note that the relative precision for $x$ translates into <i>absolute</i> precision for $\ln x$.
+This is because $\ln x \left( 1 + \epsilon \right) \approx \ln x + \epsilon $ for small $\epsilon $.
+Therefore, the relative precision of the result is at best $\frac{\epsilon }{\ln x} $.
+So to obtain $P$ decimal digits of $\ln x$, we need to know $P - \frac{\ln \left| \ln x\right| }{\ln 10} $ digits of $x$.
+This is better than the relative precision of $x$ if $x &gt; e$ but worse if $x\approx 1$.
+
+
+<p>
+
+<h3>
+<hr>Method 1: Taylor series
+</h3>
+<a name="logarithm!by Taylor series">
+
+</a>
+The logarithm function $\ln x$ for general (real or complex) $x$ such that $\left| x - 1\right|  &lt; 1$ can be computed using the Taylor series,
+$$\ln \left( 1 + z\right)  = z - \frac{z ^{2}}{2}  + \frac{z ^{3}}{3}  - \mathrm{ ... }$$
+The series converges quite slowly unless $\left| x\right| $ is small.
+For real $x &lt; 1$, the series is monotonic,
+$$\ln \left( 1 - z\right)  =  - z - \frac{z ^{2}}{2}  - \frac{z ^{3}}{3}  - \mathrm{ ... },$$
+and the round-off error is somewhat smaller in that case (but not very much smaller, because the Taylor series method is normally used only for very small $x$).
+
+
+<p>
+If $x &gt; 1$, then we can compute $ - \ln \frac{1}{x} $ instead of $\ln x$. However, the series converges very slowly if $x$ is close to $0$ or to $2$.
+
+
+<p>
+Here is an estimate of the necessary number of terms to achieve a (relative) precision of $P$ decimal digits when computing $\ln \left( 1 + x\right) $ for small real $x$.
+Suppose that $x$ is of order $10 ^{ - N}$, where $N\geq 1$.
+The error after keeping $n$ terms is not greater than the first discarded term, $\frac{x ^{n + 1}}{n + 1} $.
+The magnitude of the sum is approximately $x$, so the relative error is $\frac{x ^{n}}{n + 1} $ and this should be smaller than $10 ^{ - P}$.
+We obtain a sufficient condition $n &gt; \frac{P}{N} $.
+
+
+<p>
+All calculations need to be performed with $P$ digits of precision.
+The "rectangular" scheme for evaluating $n$ terms of the Taylor series needs about $2 \sqrt{n}$ long multiplications.
+Therefore the cost of this calculation is $2 \sqrt{\frac{P}{N} } M\left( P\right) $.
+
+
+<p>
+When $P$ is very large (so that a fast multiplication can be used) and $x$ is a small rational number, then the binary splitting technique can be used to compute the Taylor series.
+In this case the cost is $O\left( M\left( P\right)  \ln P\right) $.
+
+
+<p>
+Note that we need to know $P + N$ digits of $1 + x$ to be able to extract $P$ digits of $\ln \left( 1 + x\right) $.
+The $N$ extra digits will be lost when we subtract $1$ from $1 + x$.
+
+
+<p>
+
+<h3>
+<hr>Method 2: square roots + Taylor series
+</h3>
+<a name="logarithm!by square roots">
+
+</a>
+The method of the Taylor series allows to compute $\ln x$ efficiently when $x - 1 = 10 ^{ - N}$ is very close to $1$ (i.e. for large $N$).
+For other values of $x$ the series converges very slowly.
+We can transform the argument to improve the performance of the Taylor series.
+
+
+<p>
+One way is to take several square roots, reducing $x$ to $x ^{2 ^{ - k}}$ until $x$ becomes close to $1$.
+Then we can compute $\ln x ^{2 ^{ - k}}$ using the Taylor series and use the identity $\ln x = 2 ^{k} \ln x ^{2 ^{ - k}}$.
+
+
+<p>
+The number of times to take the square root can be chosen to minimize the total computational cost.
+Each square root operation takes the time equivalent to a fixed number $c$ of long multiplications.
+(According to the estimate of [Brent 1975], $c\approx \frac{13}{2} $.)
+Suppose $x$ is initially of order $10 ^{L}$ where $L &gt; 0$.
+Then we can take the square root $k _{1}$ times and reduce $x$ to about $1.33$.
+Here we can take $k _{1}\approx \frac{\ln L}{\ln 2}  + 3$.
+After that, we can take the square root $k _{2}$ times and reduce $x$ to $1 + 10 ^{ - N}$ with $N\geq 1$.
+For this we need $k _{2}\approx 1 + N \frac{\ln 10}{\ln 2} $ square roots.
+The cost of all square roots is $c \left( k _{1} + k _{2}\right) $ long multiplications.
+Now we can use the Taylor series and obtain $\ln x ^{2 ^{ - k _{1} - k _{2}}}$ in $2 \sqrt{\frac{P}{N} }$ multiplications.
+We can choose $N$ to minimize the total cost for a given $L$.
+
+
+<p>
+
+
+<p>
+
+<h3>
+<hr>Method 3: inverse exponential
+</h3>
+<a name="logarithm!by inverse exponential">
+
+</a>
+The method is to solve the equation $\exp \left( x\right)  - a = 0$ to find $x = \ln a$.
+We can use either the quadratically convergent Newton iteration,
+$$x' = x - 1 + \frac{a}{\exp \left( x\right) } ,$$
+or the cubically convergent Halley iteration,
+$$x' = x - 2 \frac{\exp \left( x\right)  - a}{\exp \left( x\right)  + a} .$$
+Each iteration requires one evaluation of $\exp \left( x\right) $ and one long division.
+Newton's iteration can be rewritten through $\exp \left(  - x\right) $
+but this does not really avoid a long division:
+$\exp \left(  - x\right) $ for positive $x$ is usually computed as $\frac{1}{\exp \left( x\right) } $ because other methods are much less efficient.
+Therefore the Halley iteration is preferable.
+
+
+<p>
+The initial value for $x$ can be found by bit counting on the number $a$.
+If $m$ is the "bit count" of $a$, i.e. $m$ is an integer such that $\frac{1}{2} \leq a\cdot 2 ^{ - m} &lt; 1$,
+then the first approximation to $\ln a$ is $m \ln 2$.
+(Here we can use a very rough approximation to $\ln 2$, for example, $\frac{2}{3} $.)
+
+
+<p>
+The initial value found in this fashion will be correct to about one bit.
+The number of digits triples at each Halley iteration, so the result will have about $3 k$ correct bits after $k$ iterations (this disregards round-off error).
+Therefore the required number of iterations for $P$ decimal digits is $\frac{1}{\ln 3}  \ln P \frac{\ln 2}{\ln 10} $.
+
+
+<p>
+This method is currently faster than other methods (with internal math) and so it is implemented in the routine <b><tt>Internal'LnNum</tt></b>.
+
+
+<p>
+This method can be generalized to higher orders.
+Let $y\equiv 1 - a \exp \left(  - x _{0}\right) $, where $x _{0}$ is a good approximation to $\ln a$ so $y$ is small.
+Then
+$\ln a = x _{0} + \ln \left( 1 - y\right) $ and we can expand in $y$ to obtain
+$$\ln a = x _{0} - y - \frac{y ^{2}}{2}  - \frac{y ^{3}}{3}  - \mathrm{ ... }$$
+By truncating this sum after $k$-th term we obtain a ($k - 1$)-th order method that multiplies the number of correct digits by $k + 1$ after each iteration.
+
+
+<p>
+The optimal number of terms to take depends on the speed of the implementation of $\exp \left( x\right) $.
+
+
+<p>
+
+<h3>
+<hr>Method 4: AGM
+</h3>
+<a name="logarithm!by AGM sequence">
+
+</a>
+A fast algorithm based on the AGM sequence was given by Salamin (see [Brent 1975]).
+The formula is based on an asymptotic relation,
+$$\ln x = \pi  x \frac{1 + 4 x ^{ - 2} \left( 1 - \frac{1}{\ln x} \right)  + O\left( x ^{ - 4}\right) }{2 \mathrm{ AGM }\left( x, 4\right) } .$$
+If $x$ is large enough, the numerator can be replaced by 1.
+"Large enough" for a desired precision of $P$ decimal digits means that $4 x ^{ - 2} &lt; 10 ^{ - P}$. The AGM algorithm gives $P$ digits only for such large values of $x$, unlike the Taylor series which is only good for $x$ close to 1.
+
+
+<p>
+The required number of AGM iterations is approximately $2 \frac{\ln P}{\ln 2} $. For
+smaller values of $x$ (but $x &gt; 1$),
+one can either raise $x$ to a large integer 
+power $r$ and then compute $\frac{1}{r}  \ln x ^{r}$
+(this is quick only if $x$ is itself an integer or a rational),
+or multiply $x$ by a large integer power of $2$
+and compute $\ln 2 ^{s} x - s \ln 2$ (this is better for floating-point $x$).
+Here the required powers are
+$$r = \frac{\ln 10 ^{P}\cdot 4}{2 \ln x} ,$$ $$s = P \frac{\ln 10}{2 \ln 2}  + 1 - \frac{\ln x}{\ln 2} .$$ 
+The values of these parameters can be found quickly by using the integer logarithm procedure <b><tt>IntLog</tt></b>,
+while constant values such as $\frac{\ln 10}{\ln 2} $ can be simply approximated by rational numbers because $r$ and $s$ do not need to be very precise (but they do need to be large enough).
+For the second calculation, $\ln 2 ^{s} x - s \ln 2$, we must precompute $\ln 2$ to the same precision of $P$ digits.
+Also, the subtraction of a large number $s \ln 2$ leads to a certain loss of precision, namely, about $\frac{\ln s}{\ln 10} $ decimal digits are lost, therefore the operating precision must be increased by this number of digits.
+(The quantity $\frac{\ln s}{\ln 10} $ is computed, of course, by the integer logarithm procedure.)
+
+
+<p>
+
+
+<p>
+
+<a name="logarithm!choice of AGM vs. Taylor">
+
+</a>
+If $x &lt; 1$, then ($ - \ln \frac{1}{x} $) is computed.
+
+
+<p>
+Finally, there is a special case when $x$ is very close to 1, where the Taylor series converges quickly but the AGM algorithm requires to multiply $x$ by a large power of 2 and then subtract two almost equal numbers, leading to a great waste of precision. Suppose $1 &lt; x &lt; 1 + 10 ^{ - M}$, where $M$ is large (say of order $P$). The Taylor series for $\ln \left( 1 + \epsilon \right) $ needs about $N =  - P \frac{\ln 10}{\ln \epsilon } $=$\frac{P}{M} $ terms.
+If we evaluate the Taylor series using the rectangular scheme, we need
+$2 \sqrt{N}$ multiplications and $\sqrt{N}$ units of storage. On the other
+hand, the main slow operation for the AGM sequence is the geometric mean $\sqrt{a b}$. If $\sqrt{a b}$ takes an equivalent of $c$ multiplications (Brent's estimate is $c = \frac{13}{2} $ but it may be more in practice), then the AGM sequence requires $2 c \frac{\ln P}{\ln 2} $ multiplications. Therefore the Taylor series method is more efficient for
+$$M &gt; \frac{1}{c ^{2}}  P \left( \frac{\ln 2}{\ln P} \right)  ^{2}.$$
+In this case it requires at most $c \frac{\ln P}{\ln 2} $ units of storage and $2 c \frac{\ln P}{\ln 2} $ multiplications.
+
+
+<p>
+For larger $x &gt; 1 + 10 ^{ - M}$, the AGM method is more efficient. It is necessary to increase the working precision to $P + M \frac{\ln 2}{\ln 10} $ but this does not decrease the asymptotic speed of the algorithm. To compute $\ln x$ with $P$ digits of precision for any $x$, only $O\left( \ln P\right) $ long multiplications are required.
+
+
+<p>
+
+<h3>
+<hr>Method 5: argument reduction + Taylor series
+</h3>
+<a name="logarithm!by argument reduction">
+
+</a>
+Here is a straightforward method that reduces $\ln x$ for large $x &gt; 2$ to $\ln \left( 1 + \delta \right) $ with a small $\delta $;
+now the logarithm can be quickly computed using the Taylor series.
+
+
+<p>
+The simplest version is this: for integer $m$, we have the identity $\ln x = m + \ln x e ^{ - m}$.
+Assuming that $e\equiv \exp \left( 1\right) $ is precomputed, we can find the smallest integer $m$ for which $x\leq e ^{m}$ by computing the integer powers of $e$ and comparing with $x$.
+(If $x$ is large, we do not really have to go through all integer $m$: instead we can estimate $m$ by bit counting on $x$ and start from $e ^{m}$.)
+Once we found $m$, we can use the Taylor series on $1 - \delta \equiv x e ^{ - m}$ since we have found the smallest possible $m$, so $0\leq \delta  &lt; 1 - \frac{1}{e} $.
+
+
+<p>
+A refinement of this method requires to
+precompute $b = \exp \left( 2 ^{ - k}\right) $ for some fixed integer $k\geq 1$.
+(This can be done efficiently using the squaring trick for the exponentials.)
+First we find the smallest power $m$ of $b$ which is above $x$.
+To do this, we compute successive powers of $b$ and find the first integer $m$ such that
+$x\leq b ^{m} = \exp \left( m\cdot 2 ^{ - k}\right) $.
+When we find such $m$, we define $1 - \delta \equiv x b ^{ - m}$ and then $\delta $ will be small, because $0 &lt; \delta  &lt; 1 - \frac{1}{b} \approx 2 ^{ - k}$
+(the latter approximation is good if $k$ is large).
+We compute $\ln \left( 1 - \delta \right) $ using the Taylor series and finally find $\ln x = m\cdot 2 ^{k} + \ln \left( 1 - \delta \right) $.
+
+
+<p>
+For smaller $\delta $, the Taylor series of $\ln \left( 1 - \delta \right) $ is more efficient.
+Therefore, we have a trade-off between having to perform more multiplications to find $m$, and having a faster convergence of the Taylor series.
+
+
+<p>
+
+
+<p>
+
+<h3>
+<hr>Method 6: transformed Taylor series
+</h3>
+<a name="logarithm!by transformed series">
+
+</a>
+We can use an alternative Taylor series for the logarithm that converges for all $x$,
+$$\ln \left( a + z\right)  = \ln a + 2 \sum _{k = 0} ^{\infty } \frac{1}{2 k + 1}  \left( \frac{z}{2 a + z} \right)  ^{2 k + 1}.$$
+This series is obtained from the series for $\mathrm{arctanh}\, x$ and the identity
+$$2 \mathrm{arctanh}\, x = \ln \frac{1 + x}{1 - x} .$$
+
+
+<p>
+This series converges for all $z$ such that $Re\left( a + z\right)  &gt; 0$ if $a &gt; 0$.
+The convergence rate is, however, the same as for the original Taylor series.
+In other words, it converges slowly unless $\frac{z}{2 a + z} $ is small.
+The parameter $a$ can be chosen to optimize the convergence; however, $\ln a$ should be either precomputed or easily computable for this method to be efficient.
+
+
+<p>
+For instance, if $x &gt; 1$, we can choose $a = 2 ^{k}$ for an integer $k\geq 1$, such that $2 ^{k - 1}\leq x &lt; 2 ^{k} = a$.
+(In other words, $k$ is the bit count of $x$.)
+In that case, we represent $x = a - z$ and we find that the expansion parameter $\frac{z}{2 a - z}  &lt; \frac{1}{3} $.
+So a certain rate of convergence is guaranteed, and it is enough to take a fixed number of terms, about $P \frac{\ln 10}{\ln 3} $, to obtain $P$ decimal digits of $\ln x$ for any $x$.
+(We should also precompute $\ln 2$ for this scheme to work.)
+
+
+<p>
+If $0 &lt; x &lt; 1$, we can compute $ - \ln \frac{1}{x} $.
+
+
+<p>
+This method works robustly but is slower than
+the Taylor series with some kind of argument reduction.
+With the "rectangular" method of summation, the total cost is $O\left( \sqrt{P} M\left( P\right) \right) $.
+
+
+<p>
+
+<h3>
+<hr>Method 7: binary reduction
+</h3>
+<a name="logarithm!by binary reduction">
+
+</a>
+This method is based on the binary splitting technique and is described in [Haible <i>et al.</i> 1998] with a reference to [Brent 1976].
+
+
+<p>
+The method shall compute $\ln \left( 1 + x\right) $ for real $x$ such that $\left| x\right|  &lt; \frac{1}{2} $.
+For other $x$, some sort of argument reduction needs to be applied.
+(So this method is a replacement for the Taylor series that is asymptotically faster at very high precision.)
+
+
+<p>
+The main idea is to use the property
+$$\ln \left( 1 + z\cdot 2 ^{ - k}\right)  = z\cdot 2 ^{ - k} + O\left( 2 ^{ - 2 k}\right) $$
+for integer $k\geq 1$ and real $z$ such that $\left| z\right| \leq 1$.
+This property allows to find the first $2 k$ binary digits of $\ln \left( 1 + z\cdot 2 ^{ - k}\right) $ by inspection:
+these digits are the first $k$ nonzero digits of $z$.
+Then we can perform a very quick computation of $\exp \left(  - m\cdot 2 ^{ - k}\right) $ for integer $k$, $m$ (evaluated using the binary splitting of the Taylor series)
+and reduce $z$ by at least the factor $2 ^{k}$.
+
+
+<p>
+More formally, we can write the method as a loop over $k$, starting with $k = 1$ and stopping when $2 ^{ - k} &lt; 10 ^{ - P}$ is below the required precision.
+At the beginning of the loop we have $y = 0$, $z = x$, $k = 1$ and $\left| z\right|  &lt; \frac{1}{2} $.
+The loop invariants are $\left( 1 + z\right)  \exp \left( y\right) $ which is always equal to the original number $1 + x$, and the condition $\left| z\right|  &lt; 2 ^{ - k}$.
+If we construct this loop, then it is clear that at the end of the loop $1 + z$ will become $1$ to required precision and therefore $y$ will be equal to $\ln \left( 1 + x\right) $.
+
+
+<p>
+The body of the loop consists of the following steps:
+<ul><li>Separate the first </li>$k$ significant digits of $z$:
+$$f = 2 ^{ - 2 k} \left\lfloor 2 ^{2 k} z\right\rfloor .$$
+Now $f$ is a good approximation for $\ln \left( 1 + z\right) $.
+<li>Compute </li>$\exp \left(  - f\right) $ using the binary splitting technique ($f$ is a rational number with the denominator $2 ^{2 k}$ and numerator at most $2 ^{k}$).
+It is in fact sufficient to compute $1 - \exp \left(  - f\right) $ which does not need all digits.
+<li>Set </li>$y = y + f$ and $z = \left( 1 + z\right)  \exp \left(  - f\right)  - 1$.
+</ul>
+
+<p>
+The total number of steps in the loop is at most $\frac{\ln P \frac{\ln 10}{\ln 2} }{\ln 2} $.
+Each step requires $O\left( M\left( P\right)  \ln P\right) $ operations because the exponential $\exp \left(  - f\right) $ is taken at a rational arguments $f$ and can be computed using the binary splitting technique.
+(Toward the end of the loop, the number of significant digits of $f$ grows, but the number of digits we need to obtain is decreased.
+At the last iteration, $f$ contains about half of the digits of $x$ but computing $\exp \left(  - f\right) $ requires only one term of the Taylor series.)
+Therefore the total cost is $O\left( M\left( P\right)  \left( \ln P\right)  ^{2}\right) $.
+
+
+<p>
+
+
+<p>
+Essentially the same method can be used to evaluate a complex logarithm, $\ln \left( a + \imath  b\right) $.
+It is slower but the asymptotic cost is the same.
+
+
+<p>
+
+<h3>
+<hr>Method 8: continued fraction
+</h3>
+<a name="logarithm!by continued fraction">
+
+</a>
+<a name="continued fraction approximation!of $\ln x$">
+
+</a>
+There is a continued fraction representation of the logarithm:
+$$\ln \left( 1 + x\right)  = \frac{x}{1 + \frac{x}{2 + \frac{x}{3 + \frac{4 x}{4 + \frac{4 x}{5 + \frac{9 x}{6 + \mathrm{ ... }} } } } } } .$$
+This fraction converges for all $x$, although the speed of convergence varies with the magnitude of $x$.
+
+
+<p>
+This method does not seem to provide a computational advantage compared with the other methods.
+
+
+<p>
+
+<h3>
+<hr>Method 9: bisection
+</h3>
+A simple bisection algorithm for $\frac{\ln x}{\ln 2} $ (the base 2 logarithm) with real $x$ is described in [Johnson 1987].
+
+
+<p>
+First, we need to divide $x$ by a certain power of $2$ to reduce $x$ to  $y$ in the interval $1\leq y &lt; 2$.
+We can use the bit count $m = \mathrm{ BitCount }\left( x\right) $ to find an integer $m$ such that $\frac{1}{2} \leq x\cdot 2 ^{ - m} &lt; 1$ and take $y = x\cdot 2 ^{1 - m}$.
+Then $\frac{\ln x}{\ln 2}  = \frac{\ln y}{\ln 2}  + m - 1$.
+
+
+<p>
+Now we shall find the bits in the binary representation of $\frac{\ln y}{\ln 2} $, one by one.
+Given a real $y$ such that $1\leq y &lt; 2$, the value $\frac{\ln y}{\ln 2} $ is between 0 and 1.
+Now,
+$$\frac{\ln y}{\ln 2}  = 2 ^{ - 1} \frac{\ln y ^{2}}{\ln 2} .$$
+The leading bit of this value is $1$ if $y ^{2}\geq 2$ and 0 otherwise.
+Therefore we need to compute $y' = y ^{2}$ using a long $P$-digit multiplication and compare it with $2$.
+If $y'\geq 2$ we set $y = \frac{y'}{2} $, otherwise we set $y = y'$; then we obtain $1\leq y &lt; 2$ again and repeat the process to extract the next bit of $\frac{\ln y}{\ln 2} $.
+
+
+<p>
+The process is finished either when the required number of bits of $\frac{\ln y}{\ln 2} $ is found, or when the precision of the argument is exhausted, whichever occurs first.
+Note that each iteration requires a long multiplication (squaring) of a number, and each squaring loses 1 bit of relative precision, so after $k$ iterations the number of precise bits of $y$ would be $P - k$.
+Therefore we cannot have more iterations than $P$ (the number of precise bits in the original value of $x$).
+The total cost is $O\left( P M\left( P\right) \right) $.
+
+
+<p>
+The squaring at each iteration needs to be performed not with all digits, but with the number of precise digits left in the current value of $y$.
+This does not reduce the asymptotic complexity; it remains $O\left( P M\left( P\right) \right) $.
+
+
+<p>
+Comparing this method with the Taylor series, we find that the only advantage of this method is simplicity.
+The Taylor series requires about $P$ terms, with one long multiplication and one short division per term, while the bisection method does not need any short divisions.
+However, the rectangular method of Taylor summation cuts the time down to $O\left( \sqrt{P}\right) $ long multiplications, at a cost of some storage and bookkeeping overhead.
+Therefore, the bisection method may give an advantage only at very low precisions.
+(This is why it is sometimes used in microprocessors.)
+The similar method for the exponential function requires a square root at every iteration and is never competitive with the Taylor series.
+
+
+<p>
+
+<h3>
+<hr>Which method to use
+</h3>
+This remains to be seen.
+
+
+<p>
+
+<a name="c5s4">
+
+</a>
+<h2>
+<hr>5.4 Exponential
+</h2>
+There are many methods to compute the exponential of a real number.
+Here we collect these methods and analyze them.
+
+
+<p>
+The exponential function satisfies
+$\exp \left(  - x\right)  = \frac{1}{\exp \left( x\right) } $.
+Therefore we need to consider only $x &gt; 0$.
+
+
+<p>
+
+<a name="exponential function $\exp \left( x\right) $!precision">
+
+</a>
+Note that the <i>absolute</i> precision for $x$ translates into <i>relative</i> precision for $\exp \left( x\right) $.
+This is because $\exp \left( x + \epsilon \right) \approx \exp \left( x\right)  \left( 1 + \epsilon \right) $ for small $\epsilon $.
+Therefore, to obtain $P$ decimal digits of $\exp \left( x\right) $ we need to know $x$ with absolute precision of at least $10 ^{ - P}$,
+that is, we need to know $P + \frac{\ln \left| x\right| }{\ln 10} $ digits of $x$.
+Thus, the relative precision becomes worse after taking the exponential if $x &gt; 1$ but improves if $x$ is very small.
+
+
+<p>
+
+<h3>
+<hr>Method 1: Taylor series
+</h3>
+<a name="exponential function $\exp \left( x\right) $!by Taylor series">
+
+</a>
+The exponential function is computed using its Taylor series,
+$$\exp \left( x\right)  = 1 + x + \frac{x ^{2}}{2!}  + \mathrm{ ... }$$
+This series converges for all (complex) $x$, but if $\left| x\right| $ is large, or if $x$ is negative, then the series converges slowly and/or gives a large round-off error.
+So one should use this Taylor series only when $x$ is small.
+
+
+<p>
+If $x$ is sufficiently small, e.g. $\left| x\right|  &lt; 10 ^{ - M}$ and $M &gt; \frac{\ln P}{\ln 10} $, then it is enough to take about $\frac{P}{M} $ terms in the Taylor series. If $x$ is of order 1, one needs about $P \frac{\ln 10}{\ln P} $ terms.
+
+
+<p>
+
+
+<p>
+If $x = \frac{p}{q} $ is a small rational number, and if a fast multiplication is available, then the binary splitting technique should be used to evaluate the Taylor series.
+The computational cost of that is $O\left( M\left( P \ln P\right)  \ln P\right) $.
+
+
+<p>
+
+<h3>
+<hr>Method 2: squaring + Taylor series
+</h3>
+<a name="exponential function $\exp \left( x\right) $!squaring speed-up">
+
+</a>
+A speed-up trick used for large $x$ is to divide the argument by some power of 2 and then square the result several times, i.e.
+$$\exp \left( x\right)  = \left( \exp \left( 2 ^{ - k} x\right) \right)  ^{2 ^{k}},$$
+where $k$ is chosen sufficiently large so that the Taylor series converges quickly at $2 ^{ - k} x$ [Smith 1985]. The threshold value for $x$ can be obtained through <b><tt>MathExpThreshold()</tt></b>, and set through <b><tt>SetMathExpThreshold(threshold)</tt></b> in <b><tt>stdfuncs</tt></b>.
+
+
+<p>
+
+
+<p>
+A modification of the squaring reduction allows to significantly reduce the round-off error [Brent 1978].
+Instead of $\exp \left( x\right)  = \left( \exp \left( \frac{x}{2} \right) \right)  ^{2}$, we use the identity
+$$\exp \left( x\right)  - 1 = \left( \exp \left( \frac{x}{2} \right)  - 1\right)  \left( \exp \left( \frac{x}{2} \right)  + 1\right) $$
+and reduce $\exp \left( x\right)  - 1$ directly to $\exp \left( \frac{x}{2} \right)  - 1$.
+If $y = \exp \left( \frac{x}{2} \right)  - 1$, then $\exp \left( x\right)  - 1 = 2 y + y ^{2}$.
+
+
+<p>
+
+
+<p>
+
+<h3>
+<hr>Method 3: inverse logarithm
+</h3>
+<a name="exponential function $\exp \left( x\right) $!by inverse logarithm">
+
+</a>
+An alternative way to compute $x = \exp \left( a\right) $ if a fast logarithm routine is available would be to solve the equation $\ln x = a$.
+(This might be better at very large precision where the AGM method for the logarithm is asymptotically the fastest.)
+
+
+<p>
+Newton's method gives the iteration
+$$x' = x \left( a + 1 - \ln x\right) .$$
+The iteration converges quadratically to $\exp \left( a\right) $ if the initial value of $x$ is $0 &lt; x &lt; \exp \left( a + 1\right) $.
+
+
+<p>
+A cubically convergent formula is obtained if we replace $\ln x = a$ by an equivalent equation
+$$\frac{\ln x - a}{\ln x - a - 2}  = 0.$$
+For this equation, Newton's method gives the iteration
+$$x' = x \frac{1 + \left( a + 1 - \ln x\right)  ^{2}}{2} .$$
+This iteration converges for initial values $0 &lt; x &lt; \exp \left( a + 2\right) $ with a cubic convergence rate and requires only one more multiplication, compared with Newton's method for $\ln x = a$. A good initial guess can be found by raising 2 to the integer part of $\frac{a}{\ln 2} $ (the value $\ln 2$ can be approximated from above by a suitable rational number, e.g. $\frac{7050}{10171} $).
+
+
+<p>
+This cubically convergent iteration seems to follow from a good equivalent equation that we guessed.
+But it turns out that it can be generalized to higher orders.
+Let $y\equiv a - \ln x _{0}$ where $x _{0}$ is an approximation to $\exp \left( a\right) $; if it is a good approximation, then $y$ is small.
+Then $\exp \left( a\right)  = x _{0} \exp \left( y\right) $.
+Expanding in $y$, we obtain
+$$\exp \left( a\right)  = x _{0} \left( 1 + y + \frac{y ^{2}}{2!}  + \frac{y ^{3}}{3!}  + \mathrm{ ... }\right) ,$$
+and if we truncate the series after $k$-th term, the new approximation will have $k$ times the number of correct digits in $x _{0}$.
+It is easy to see that the above cubic iteration is a particular case with $k = 3$.
+
+
+<p>
+The optimal number of terms to take depends on the speed of the implementation of $\ln x$.
+
+
+<p>
+
+<h3>
+<hr>Method 4: linear reduction + Taylor series
+</h3>
+<a name="exponential function $\exp \left( x\right) $!by linear reduction">
+
+</a>
+In this method we reduce the argument $x$ by subtracting an integer.
+Suppose $x &gt; 1$, then take $n = \left\lfloor x\right\rfloor $ where $n$ is an integer, so that $0\leq x - n &lt; 1$.
+Then we can compute $\exp \left( x\right)  = \exp \left( n\right)  \exp \left( x - n\right) $ by using the Taylor series on the small number $x - n$.
+The integer power $e ^{n}$ is found from a precomputed value of $e$.
+
+
+<p>
+A refinement of this method is to subtract not only the integer part of $x$, but also the first few binary digits.
+We fix an integer $k\geq 1$ and precompute $b\equiv \exp \left( 2 ^{ - k}\right) $.
+Then we find the integer $m$ such that $0\leq x - m\cdot 2 ^{ - k} &lt; 2 ^{ - k}$.
+(The rational number $m\cdot 2 ^{ - k}$ contains the integer part of $x$ and the first $k$ bits of $x$ after the binary point.)
+Then we compute $\exp \left( x - m\cdot 2 ^{ - k}\right) $ using the Taylor series and $\exp \left( m\cdot 2 ^{ - k}\right)  = b ^{m}$ by the integer powering algorithm from the precomputed value of $b$.
+
+
+<p>
+The parameter $k$ should be chosen to minimize the computational effort.
+
+
+<p>
+
+
+<p>
+
+<h3>
+<hr>Method 5: binary rediction
+</h3>
+<a name="exponential function $\exp \left( x\right) $!by binary reduction">
+
+</a>
+This method is based on the binary splitting technique and is described in [Haible <i>et al.</i> 1998] with a reference to [Brent 1976].
+The idea is to reduce the computation of $\exp \left( x\right) $ to the computation of $\exp \left( r _{k}\right) $ for some rational numbers $r _{0}$, $r _{1}$, $r _{2}$, ...
+
+
+<p>
+Take the binary decomposition of $x$ of the following form,
+$$x = x _{0} + \sum _{k = 0} ^{N} u _{k}\cdot 2 ^{ - 2 ^{k}},$$
+where $x _{0}$ and $u _{k}$ are integers such that $\left| u _{k}\right|  &lt; 2 ^{2 ^{k - 1}}$.
+Then define $r _{k} = u _{k}\cdot 2 ^{ - 2 ^{k}}$.
+Note that all $r _{k}$ are rational numbers such that $\left| r _{k}\right|  &lt; 2 ^{ - 2 ^{k - 1}}$.
+The exponentials $\exp \left( r _{k}\right) $ are computed using the binary splitting on the Taylor series.
+Finally,
+$$\exp \left( x\right)  = \exp \left( x _{0}\right)  \exp \left( r _{0}\right)  \exp \left( r _{1}\right)  \mathrm{ ... }.$$
+
+
+<p>
+The cost of this method is $O\left( M\left( P \ln P\right)  \ln P\right) $ operations.
+
+
+<p>
+Essentially the same method can be used to compute the complex exponential, $\exp \left( a + \imath  b\right) $.
+This is slower but the asymptotic cost is the same.
+
+
+<p>
+
+<h3>
+<hr>Method 6: continued fraction
+</h3>
+<a name="exponential function $\exp \left( x\right) $!by continued fraction">
+
+</a>
+<a name="continued fraction approximation!of $\exp \left( x\right) $">
+
+</a>
+There is a continued fraction representation of the exponential function:
+$$\exp \left(  - x\right)  = 1 - \frac{x}{1 + \frac{x}{2 - \frac{x}{3 + \frac{x}{2 - \frac{x}{5 + \frac{x}{2 - \mathrm{ ... }} } } } } } .$$
+This fraction converges for all $x$, although the speed of convergence varies with the magnitude of $x$.
+
+
+<p>
+This method does not seem to provide a computational advantage compared with the other methods.
+
+
+<p>
+
+<h3>
+<hr>Which method to use
+</h3>
+This remains to be seen.
+
+
+<p>
+
+<a name="c5s5">
+
+</a>
+<h2>
+<hr>5.5 Calculation of $\pi $
+</h2>
+<a name="computation of $\pi $">
+
+</a>
+In Yacas, the constant $\pi $ is computed by the library routine <b><tt>Internal'Pi()</tt></b> which
+uses the internal routine <b><tt>MathPi</tt></b> to compute the value to current
+precision <b><tt>Builtin'Precision'Set()</tt></b>. The result is stored in a global variable as a
+list of the form <b><tt>{precision, value}</tt></b> where <b><tt>precision</tt></b> is the number of
+digits of $\pi $ that have already been found and <b><tt>value</tt></b> is the
+multiple-precision value. This is done to avoid recalculating $\pi $ if a
+precise enough value for it has already been found.
+
+
+<p>
+Efficient iterative algorithms for computing $\pi $ with arbitrary precision have been recently developed by Brent, Salamin, Borwein and others. However, limitations of the current multiple-precision implementation in Yacas (compiled with the "internal" math option) make these advanced algorithms run slower because they require many more arbitrary-precision multiplications at each iteration.
+
+
+<p>
+
+<a name="computation of $\pi $!by Newton's method">
+
+</a>
+The file <b><tt>examples/pi.ys</tt></b> implements several different algorithms that
+duplicate the functionality of <b><tt>Internal'Pi()</tt></b>. See
+[Gourdon <i>et al.</i> 2001] for more details of computations of $\pi $ and
+generalizations of Newton-Raphson iteration.
+
+
+<p>
+
+<h3>
+<hr>Method 1: solve $\sin x = 0$
+</h3>
+<b><tt>PiMethod0()</tt></b>, <b><tt>PiMethod1()</tt></b>, <b><tt>PiMethod2()</tt></b> are all based on a generalized Newton-Raphson method of solving equations.
+
+
+<p>
+Since $\pi $ is a solution of $\sin x = 0$, one may start sufficiently close, e.g. at $x_{0} = 3.14159265$ and iterate $x' = x - \tan x$. In fact it is faster to iterate
+$x' = x + \sin x$ which solves a different equation for $\pi $. <b><tt>PiMethod0()</tt></b> is the straightforward implementation of the latter iteration. A significant speed improvement is achieved by doing calculations at each iteration only with the precision of the root that we expect to get from that iteration. Any imprecision introduced by round-off will be automatically corrected at the next iteration.
+
+
+<p>
+If at some iteration $x = \pi  + \epsilon $ for small $\epsilon $, then from the Taylor expansion of $\sin x$ it follows that the value $x'$ at the next iteration will differ from $\pi $ by $O\left( \epsilon  ^{3}\right) $. Therefore, the number of correct digits triples at each iteration. If we know the number of correct digits of $\pi $ in the initial approximation, we can decide in advance how many iterations to compute and what precision to use at each iteration.
+
+
+<p>
+The final speed-up in <b><tt>PiMethod0()</tt></b> is to avoid computing at unnecessarily high precision. This may happen if, for example, we need to evaluate 200 digits of $\pi $ starting with 20 correct digits. After 2 iterations we would be calculating with 180 digits; the next iteration would have given us 540 digits but we only need 200, so the third iteration would be wasteful. This can be avoided by first computing $\pi $ to just over 1/3 of the required precision, i.e. to 67 digits, and then executing the last iteration at full 200 digits. There is still a wasteful step when we would go from 60 digits to 67, but much less time would be wasted than in the calculation with 200 digits of precision.
+
+
+<p>
+Newton's method is based on approximating the function $f\left( x\right) $ by a straight line. One can achieve better approximation and therefore faster convergence to the root if one approximates the function with a polynomial curve of higher order. The routine <b><tt>PiMethod1()</tt></b> uses the iteration 
+$$x' = x + \sin x + \frac{1}{6}  \left( \sin x\right)  ^{3} + \frac{3}{40}  \left( \sin x\right)  ^{5} + \frac{5}{112}  \left( \sin x\right)  ^{7}$$
+which has a faster convergence, giving 9 times as many digits at every iteration. (The series is the Taylor series for $\arcsin y$ cut at $O\left( y ^{9}\right) $.) The same speed-up tricks are used as in <b><tt>PiMethod0()</tt></b>. In addition, the last iteration, which must be done at full precision, is performed with the simpler iteration $x' = x + \sin x$ to reduce the number of high-precision multiplications.
+
+
+<p>
+Both <b><tt>PiMethod0()</tt></b> and <b><tt>PiMethod1()</tt></b> require a computation of $\sin x$ at every iteration. An industrial-strength arbitrary precision library such as <b><tt>gmp</tt></b> can multiply numbers much faster than it can evaluate a trigonometric function. Therefore, it would be good to have a method which does not require trigonometrics. <b><tt>PiMethod2()</tt></b> is a simple attempt to remedy the problem. It computes the Taylor series for $\arctan x$,
+$$\arctan x = x - \frac{x ^{3}}{3}  + \frac{x ^{5}}{5}  - \frac{x ^{7}}{7}  + \mathrm{ ... },$$
+for the value of $x$ obtained as the tangent of the initial guess for $\pi $; in other words, if $x = \pi  + \epsilon $ where $\epsilon $ is small, then $\tan x = \tan \epsilon $, therefore $\epsilon  = \arctan \tan x$ and $\pi $ is found as $\pi  = x - \epsilon $. If the initial guess is good (i.e. $\epsilon $ is very small), then the Taylor series for $\arctan x$ converges very quickly (although linearly, i.e. it gives a fixed number of digits of $\pi $ per term). Only a single full-precision evaluation of $\tan x$ is necessary at the beginning of the algorithm.
+The complexity of this algorithm is proportional to the number of digits and to the time of a long multiplication.
+
+
+<p>
+
+<h3>
+<hr>Method 2: Borwein's iteration
+</h3>
+The routines <b><tt>PiBrentSalamin()</tt></b> and <b><tt>PiBorwein()</tt></b> are based on much more advanced mathematics.
+(See papers by P. Borwein for review and explanations of the methods.)
+These methods do not require evaluations of trigonometric functions, but they do require taking a few square roots at each iteration, and all calculations must be done using full precision. Using modern algorithms, one can compute a square root roughly in the same time as a division; but Yacas's internal math is not yet up to it. Therefore, these two routines perform poorly compared to the more simple-minded <b><tt>PiMethod0()</tt></b>.
+
+
+<p>
+
+<h3>
+<hr>Method 3: AGM sequence (Brent-Salamin)
+</h3>
+<a name="computation of $\pi $!by Brent-Salamin method">
+
+</a>
+The algorithm of Brent and Salamin uses the AGM sequence.
+The calculation can be summarized as follows:
+
+
+<p>
+$$ \left( a = 1, b = \frac{1}{\sqrt{2}} , c = \frac{1}{2} , k = 1\right) $$
+<table cellpadding="0" width="100%">
+<tr><td width=100% bgcolor="#DDDDEE"><pre>
+While(Not enough precision) [
+</pre></tr>
+</table>
+$$\left( a, b\right)  = \left( \frac{a + b}{2} , \sqrt{a b}\right) $$
+$$c = c - 2 ^{k} \left( a ^{2} - b ^{2}\right) $$
+$$\pi  = 2 \frac{a ^{2}}{c} $$
+$$k = k + 1$$
+<table cellpadding="0" width="100%">
+<tr><td width=100% bgcolor="#DDDDEE"><pre>
+];
+</pre></tr>
+</table>
+
+
+<p>
+At each iteration, the variable $\pi $ will have twice as many correct digits as it had at the previous iteration.
+
+
+<p>
+
+<h3>
+<hr>Method 4: Ramanujan's series
+</h3>
+<a name="computation of $\pi $!by Ramanujan's series">
+
+</a>
+Another method for fast computation of $\pi $ is based on the following mysterious series,
+$$\frac{1}{\pi }  = \frac{12}{C \sqrt{C}}  \sum _{n = 0} ^{\infty } \left(  - 1\right)  ^{n} \left( 6 n\right) ! \frac{A + n B}{\left( 3 n\right) ! \left( n!\right)  ^{3} C ^{3 n}} ,$$
+where $A = 13591409$, $B = 545140134$, and $C = 640320$.
+This formula was found by the Chudnovsky brothers, but it traces back to Ramanujan's notebooks.
+
+
+<p>
+To obtain the value of $\pi $ with $P$ decimal digits, one needs to take 
+$$n\approx P \frac{\ln 10}{3 \ln \frac{C}{12} }  &lt; \frac{479}{6793}  P$$
+terms of the series.
+
+
+<p>
+If this series is evaluated using Horner's scheme (the routine <b><tt>PiChudnovsky</tt></b>), then about $\frac{\ln n}{\ln 10} $ extra digits are needed to compensate for round-off error while adding $n$ terms.
+This method does not require any long multiplications and costs $O\left( P ^{2}\right) $ operations.
+
+
+<p>
+A potentially much faster way to evaluate this series at high precision is by using the binary splitting technique.
+This would give the asymptotic cost $O\left( M\left( P \ln P\right)  \ln P\right) $.
+
+
+<p>
+
+<h3>
+<hr>Which method to use
+</h3>
+This remains to be seen.
+
+
+<p>
+
+<a name="c5s6">
+
+</a>
+<h2>
+<hr>5.6 Trigonometric functions
+</h2>
+Trigonometric functions $\sin x$, $\cos x$ are computed by subtracting $2 \pi $ from $x$ until it is in the range $0 &lt; x &lt; 2 \pi $ and then using the Taylor series.
+(The value of $\pi $ is precomputed.)
+
+
+<p>
+Tangent is computed by dividing $\frac{\sin x}{\cos x} $ or from $\sin x$ using the identity
+$$\tan x = \frac{\sin x}{\sqrt{1 - \left( \sin x\right)  ^{2}}} .$$
+
+
+<p>
+
+<h3>
+<hr>Method 1: Taylor series
+</h3>
+The Taylor series for the basic trigonometric functions are
+$$\sin x = x - \frac{x ^{3}}{3!}  + \frac{x ^{5}}{5!}  - \frac{x ^{7}}{7!}  + \mathrm{ ... },$$
+$$\cos x = 1 - \frac{x ^{2}}{2!}  + \frac{x ^{4}}{4!}  - \frac{x ^{6}}{6!}  + \mathrm{ ... }.$$
+These series converge for all $x$ but are optimal for multiple-precision calculations only for small $x$.
+The convergence rate and possible optimizations are the same as those of the Taylor series for $\exp \left( x\right) $.
+
+
+<p>
+
+<h3>
+<hr>Method 2: argument reduction
+</h3>
+Basic argument reduction requires a precomputed value for $\frac{\pi }{2} $.
+The identities $\sin \left( x + \frac{\pi }{2} \right)  = \cos x$, $\cos \left( x + \frac{\pi }{2} \right)  =  - \sin x$ can be used to reduce the argument to the range between $0$ and $\frac{\pi }{2} $.
+Then the bisection for $\cos x$ and the trisection for $\sin x$ are used.
+
+
+<p>
+For $\cos x$, the bisection identity can be used more efficiently if it is written as
+$$1 - \cos 2 x = 4 \left( 1 - \cos x\right)  - 2 \left( 1 - \cos x\right)  ^{2}.$$
+If $1 - \cos x$ is very small, then this decomposition allows to use a shorter multiplication and reduces round-off error.
+
+
+<p>
+For $\sin x$, the trisection identity is
+$$\sin 3 x = 3 \sin x - 4 \left( \sin x\right)  ^{3}.$$
+
+
+<p>
+The optimal number of bisections or trisections should be estimated to reduce the total computational cost.
+The resulting number will depend on the magnitude of the argument $x$, on the required precision $P$, and on the speed of the available multiplication $M\left( P\right) $.
+
+
+<p>
+
+<h3>
+<hr>Method 3: inverse $\arctan x$
+</h3>
+The function $\arctan x$ can be found from its Taylor series, or from the complex AGM method, or by another method.
+Then the function can be inverted by Newton's iteration to obtain $\tan x$ and from it also $\sin x$, $\cos x$ using the trigonometric identities.
+
+
+<p>
+Alternatively, $\arcsin x$ may be found from the Taylor series and inverted to obtain $\sin x$.
+
+
+<p>
+This method seems to be of marginal value since efficient direct methods for $\cos x$, $\sin x$ are available.
+
+
+<p>
+
+<h3>
+<hr>Which method to use
+</h3>
+This remains to be seen.
+
+
+<p>
+
+<a name="c5s7">
+
+</a>
+<h2>
+<hr>5.7 Inverse trigonometric functions
+</h2>
+<a name="computation of $\arctan x$">
+
+</a>
+<a name="continued fraction approximation!of $\arctan x$">
+
+</a>
+Inverse trigonometric functions are computed by various methods.
+To compute $y = \arcsin x$, Newton's method is used for to invert $x = \sin y$.
+The inverse tangent $\arctan x$ can be computed by its Taylor series,
+$$\arctan x = x - \frac{x ^{3}}{3}  + \frac{x ^{5}}{5}  - \mathrm{ ... },$$
+or by the continued fraction expansion,
+$$\arctan x = \frac{x}{1 + \frac{x ^{2}}{3 + \frac{\left( 2 x\right)  ^{2}}{5 + \frac{\left( 3 x\right)  ^{2}}{7 + \mathrm{ ... }} } } } .$$
+The convergence of this expansion for large $\left| x\right| $ is improved by using the identities
+$$\arctan x = \frac{\pi }{2}  \mathrm{ Sign }\left( x\right)  - \arctan \frac{1}{x} ,$$
+$$\arctan x = 2 \arctan \frac{x}{1 + \sqrt{1 + x ^{2}}} .$$
+Thus, any value of $x$ is reduced to $\left| x\right|  &lt; 0.42$. This is implemented in the standard library scripts.
+
+
+<p>
+By the identity $\arccos x\equiv \frac{\pi }{2}  - \arcsin x$, the inverse cosine is reduced to the inverse sine. Newton's method for $\arcsin x$ consists of solving the equation $\sin y = x$ for $y$. Implementation is similar to the calculation of $\pi $ in <b><tt>PiMethod0()</tt></b>. 
+
+
+<p>
+For $x$ close to 1, Newton's method for $\arcsin x$ converges very slowly. An identity $$\arcsin x = \mathrm{ Sign }\left( x\right)  \left( \frac{\pi }{2}  - \arcsin \sqrt{1 - x ^{2}}\right) $$ can be used in this case. Another potentially useful identity is
+$$\arcsin x = 2 \arcsin \frac{x}{\sqrt{2} \sqrt{1 + \sqrt{1 - x ^{2}}}} .$$
+
+
+<p>
+Inverse tangent can also be related to inverse sine by
+$$\arctan x = \arcsin \frac{x}{\sqrt{1 + x ^{2}}} ,$$
+$$\arctan \frac{1}{x}  = \arcsin \frac{1}{\sqrt{1 + x ^{2}}} .$$
+
+
+<p>
+Alternatively, the Taylor series can be used for the inverse sine:
+$$\arcsin x = x + \frac{1}{2}  \frac{x ^{3}}{3}  + \frac{1\cdot 3}{2\cdot 4}  \frac{x ^{5}}{5}  + \frac{1\cdot 3\cdot 5}{2\cdot 4\cdot 6}  \frac{x ^{7}}{7}  + \mathrm{ ... }.$$
+
+
+<p>
+
+<a name="continued fraction approximation!of $\tan x$">
+
+</a>
+An everywhere convergent continued fraction can be used for the tangent:
+$$\tan x = \frac{x}{1 - \frac{x ^{2}}{3 - \frac{x ^{2}}{5 - \frac{x ^{2}}{7 - \mathrm{ ... }} } } } .$$
+
+
+<p>
+Hyperbolic and inverse hyperbolic functions are reduced to exponentials and logarithms:
+$\cosh x = \frac{1}{2}  \left( \exp \left( x\right)  + \exp \left(  - x\right) \right) $, $\sinh x = \frac{1}{2}  \left( \exp \left( x\right)  - \exp \left(  - x\right) \right) $, $\tanh x = \frac{\sinh x}{\cosh x} $,
+$$\mathrm{arccosh}\, x = \ln \left( x + \sqrt{x ^{2} - 1}\right) ,$$
+$$\mathrm{arcsinh}\, x = \ln \left( x + \sqrt{x ^{2} + 1}\right) ,$$
+$$\mathrm{arctanh}\, x = \frac{1}{2}  \ln \frac{1 + x}{1 - x} .$$
+
+
+<p>
+
+<h3>
+<hr>Continued fraction for $\arctan x$
+</h3>
+<a name="computation of $\arctan x$!by continued fraction">
+
+</a>
+<a name="continued fraction approximation!of $\arctan x$">
+
+</a>
+The idea to use continued fraction expansions for <b><tt>ArcTan</tt></b> comes from the book [Crenshaw 2000].
+In that book the author explains how he got the idea to use continued fraction
+expansions to approximate $\arctan x$, given that the Taylor series converges
+slowly, and having a hunch that in that case the continued fraction expansion
+then converges rapidly. He then proceeds to show that in the case of
+$\arctan x$, this advantage is very significant. However, it might not be true for all
+slowly converging series.
+
+
+<p>
+
+
+<p>
+The convergence of the continued fraction expansion of $\arctan x$ is indeed better than convergence of the Taylor series. Namely, the Taylor series converges only for $\left| x\right|  &lt; 1$ while the continued fraction converges for all $x$. However, the speed of its convergence is not uniform in $x$; the larger the value of $x$, the slower the convergence. The necessary number of terms of the continued fraction is in any case proportional to the required number of digits of precision, but the constant of proportionality depends on $x$.
+
+
+<p>
+
+<a name="computation of $\arctan x$!by continued fraction!convergence rate">
+
+</a>
+This can be understood by the following argument.
+The difference between two partial continued fractions that differ only by one extra last term can be estimated as
+$$\left| \delta \right| \equiv \left| \frac{b _{0}}{a _{1} + \frac{b _{1}}{\mathrm{ ... } + \frac{b _{n - 1}}{a _{n}} } }  - \frac{b _{0}}{a _{1} + \frac{b _{1}}{\mathrm{ ... } + \frac{b _{n}}{a _{n + 1}} } } \right|  &lt; \frac{b _{0} b _{1} \mathrm{ ... } b _{n}}{\left( a _{1} \mathrm{ ... } a _{n}\right)  ^{2} a _{n + 1}} .$$
+(This is a conservative estimate that could be improved with more careful analysis.
+See also the section on numerical continued fractions.)
+For the above continued fraction for $\arctan x$, this directly gives the following estimate,
+$$\left| \delta \right|  &lt; \frac{x ^{2 n + 1} \left( n!\right)  ^{2}}{\left( 2 n + 1\right)  \left( \left( 2 n - 1\right) !!\right)  ^{2}} \approx \pi  \left( \frac{x}{2} \right)  ^{2 n + 1}.$$
+This formula only gives a meaningful bound if $x &lt; 2$, but it is clear that the precision generally becomes worse when $x$ grows. If we need $P$ digits of precision, then, for a given $x$, the number of terms $n$ has to be large enough so that the relative precision is sufficient, i.e. $$\frac{\delta }{\arctan x}  &lt; 10 ^{ - P}.$$ This gives $n &gt; \frac{P \ln 10}{\ln 4 - 2 \ln x} $ and for $x = 1$, $n &gt; \frac{3}{2}  P$. This estimate is very close for small $x$ and only slightly suboptimal for larger $x$: numerical experimentation shows that for $x\leq 1$, the required number of terms for $P$ decimal digits is only about $\frac{4}{3}  P$, and for $x\leq 0.42$, $n$ must be about $\frac{3}{4}  P$. If $x &lt; 1$ is very small then one needs a much smaller number of terms $n &gt; P \frac{\ln 10}{\ln 4 - 2 \ln x} $.
+Round-off errors may actually make the result less precise if we use many more terms than needed.
+
+
+<p>
+
+<a name="computation of $\arctan x$!by Taylor series">
+
+</a>
+If we compare the rate of convergence of the continued fraction for $\arctan x$  with the Taylor series
+$$\arctan x = \sum _{n = 0} ^{\infty } \frac{\left(  - 1\right)  ^{n} x ^{2 n + 1}}{2 n + 1} ,$$
+we find that the number of terms of the Taylor series needed for $P$ digits is about
+$n &gt; \frac{P \ln 10}{2 \ln x} $.
+Since the range of $x$ can be reduced to about [0, 0.42] by trigonometric identities, the difference between this and $P \frac{\ln 10}{\ln 4 - 2 \ln x} $ is never very large.
+At most twice as many terms $n$ are needed in the Taylor series as in the continued fraction.
+However, a Taylor series can be evaluated efficiently using $O\left( \sqrt{n}\right) $ long multiplications, while a continued fraction with $n$ terms always requires $n$ divisions.
+Therefore, at high enough precision the continued fraction method will be much less efficient than the Taylor series.
+
+
+<p>
+
+<h3>
+<hr>Which method to use
+</h3>
+This remains to be seen.
+
+
+<p>
+
+<a name="c5s8">
+
+</a>
+<h2>
+<hr>5.8 Factorials and binomial coefficients
+</h2>
+<a name="factorial">
+
+</a>
+The factorial is defined by $n!\equiv n \left( n - 1\right)  \mathrm{ ... }\cdot 1$ for integer $n\geq 1$ and the binomial coefficient is defined by
+$${n \choose m}\equiv \frac{n!}{m! \left( n - m\right) !} .$$
+
+
+<p>
+
+<a name="double factorial">
+
+</a>
+The "double factorial" $n!!\equiv n \left( n - 2\right)  \left( n - 4\right)  \mathrm{ ... }$ is also useful for some calculations.
+For convenience, one defines $0!\equiv 1$, $0!!\equiv 1$, and $\left(  - 1\right) !!\equiv 1$;
+with these definitions, the recurrence relations
+$$n! \left( n + 1\right)  = \left( n + 1\right) !,$$
+$$n!! \left( n + 2\right)  = \left( n + 2\right) !!$$
+are valid also for $n = 0$ and $n =  - 1$.
+
+
+<p>
+There are two tasks related to the factorial: the exact integer calculation and an approximate calculation to some floating-point precision. Factorial of $n$ has approximately $n \frac{\ln n}{\ln 10} $ decimal digits, so an exact calculation is practical only for relatively small $n$. In the current implementation, exact factorials for $n &gt; 65535$ are not computed but print an error message advising the user to avoid exact computations of large factorials.
+For example, <b><tt>Internal'LnGammaNum(n+1)</tt></b> is able to compute $\ln n!$ for very large $n$ to any desired floating-point precision.
+
+
+<p>
+
+<h3>
+<hr>Exact factorials
+</h3>
+To compute factorials exactly, we use two direct methods. The first method is
+to multiply the numbers $1$, $2$, ..., $n$ in a loop. This method requires $n$
+multiplications of short numbers with $P$-digit numbers, where $P = O\left( n \ln n\right) $
+is the number of digits in $n!$. Therefore its complexity is $O\left( n ^{2} \ln n\right) $.
+This factorial routine is implemented in the Yacas core with a small speedup:
+consecutive pairs of integers are first multiplied together using platform math
+and then multiplied by the accumulator product.
+
+
+<p>
+
+<a name="factorial!by bisection method">
+
+</a>
+A second method uses a binary tree arrangement of the numbers $1$, $2$, ..., $n$ similar to the recursive sorting routine ("merge-sort"). If we denote by <b><tt>a *** b</tt></b> the "partial factorial" product $a \left( a + 1\right)  \mathrm{ ... }\left( b - 1\right)  b$, then the tree-factorial algorithm consists of replacing $n!$ by $1\mathrm{ *** }n$ and recursively evaluating
+$\left( 1\mathrm{ *** }m\right)  \left( \left( m + 1\right) \mathrm{ *** }n\right) $ for some integer $m$ near $\frac{n}{2} $. The partial factorials of nearby numbers such as $m\mathrm{ *** }\left( m + 2\right) $ are evaluated explicitly. The binary tree algorithm requires one multiplication of $\frac{P}{2} $ digit integers at the last step, two $\frac{P}{4} $ digit multiplications at the last-but-one step and so on. There are $O\left( \ln n\right) $ total steps of the recursion. If the cost of multiplication is $M\left( P\right)  = P ^{1 + a} \left( \ln P\right)  ^{b}$, then one can show that the total cost of the binary tree algorithm is $O\left( M\left( P\right) \right) $ if $a &gt; 0$ and $O\left( M\left( P\right)  \ln n\right) $ if $a = 0$ (which is the best asymptotic multiplication algorithm).
+
+
+<p>
+Therefore, the tree method wins over the simple method if the cost of multiplication is lower than quadratic.
+
+
+<p>
+The tree method can also be used to compute "double factorials" ($n!!$). This is faster than to use the identities
+$$\left( 2 n\right) !! = 2 ^{n} n!$$ and
+$$\left( 2 n - 1\right) !! = \frac{\left( 2 n\right) !}{2 ^{n} n!} .$$
+Double factorials are used, for instance, in the exact calculation of the Gamma function of half-integer arguments.
+
+
+<p>
+
+<a name="binomial coefficients">
+
+</a>
+Binomial coefficients ${n \choose m}$ are found by first selecting the smaller of $m$, $n - m$ and using the identity ${n \choose m} = {n \choose n - m}$. Then a partial factorial is used to compute
+$${n \choose m} = \frac{\left( n - m + 1\right) \mathrm{ *** }n}{m!} .$$
+This is always much faster than computing the three factorials in the definition of ${n \choose m}$.
+
+
+<p>
+
+<h3>
+<hr>Approximate factorials
+</h3>
+<a name="Gamma function">
+
+</a>
+A floating-point computation of the factorial may proceed either via Euler's Gamma function, $n! = \Gamma \left( n + 1\right) $,
+or by a direct method (multiplying the integers and maintaining a certain floating-point precision).
+If the required precision is much less than the number of digits in the exact factorial, then almost all multiplications will be truncated to the precision $P$ and the tree method $O\left( n M\left( P\right) \right) $ is always slower than the simple method $O\left( n P\right) $.
+
+
+<p>
+
+<h3>
+<hr>Which method to use
+</h3>
+This remains to be seen.
+
+
+<p>
+
+<a name="c5s9">
+
+</a>
+<h2>
+<hr>5.9 Classical orthogonal polynomials: general case
+</h2>
+<a name="orthogonal polynomials">
+
+</a>
+A family of orthogonal polynomials is a sequence of polynomials $q_n\left( x\right) $, $n = 0$, $1$, ... that satisfy the orthogonality condition on some interval [$a$, $b$] with respect to some weight function $\rho \left( x\right) $:
+$$\int _{a} ^{b } q_m\left( x\right)  q_n\left( x\right)  \rho \left( x\right)  dx = 0$$
+for $m\neq n$.
+The interval [$a$, $b$] can be finite or infinite and the weight function must be real and non-negative on this interval.
+
+
+<p>
+In principle, one could choose any (non-negative) weight function $\rho \left( x\right) $ and any interval [$a$, $b$] and construct the corresponding family of orthogonal polynomials $q_n\left( x\right) $.
+For example, take $q_0 = 1$, then take $q_1 = x + c$ with unknown $c$ and find such $c$ that $q_0$ and $q_1$ satisfy the orthogonality condition;
+this requires solving a linear equation.
+Then we can similarly find two unknown coefficients of $q_2$ and so on.
+(This is called the Gramm-Schmidt orthogonalization procedure.)
+
+
+<p>
+But of course not all weight functions $\rho \left( x\right) $ and not all intervals [$a$, $b$] are equally interesting.
+There are several "classical" families of orthogonal polynomials that have been of use to theoretical and applied science.
+The "classical" polynomials are always solutions of a simple second-order differential equation and are always a specific case of some hypergeometric function.
+
+
+<p>
+The construction of "classical" polynomials can be described by the following scheme.
+The function $\rho \left( x\right) $ must satisfy the so-called Pearson's equation,
+$$\frac{1}{\rho \left( x\right) }  \left( \frac{d}{d x}\rho \left( x\right) \right)  = \frac{\alpha \left( x\right) }{\beta \left( x\right) } ,$$
+where the functions $\alpha $, $\beta $ are of the form
+$$\alpha \left( x\right)  = \alpha _0 + \alpha _1 x,$$ 
+$$\beta \left( x\right)  = \beta _0 + \beta _1 x + \beta _2 x ^{2}.$$
+Also, the following boundary conditions must be satisfied at both ends $a$, $b$ of the interval,
+$$\rho \left( a\right)  \beta \left( a\right)  = \rho \left( b\right)  \beta \left( b\right)  = 0.$$
+
+
+<p>
+
+<a name="orthogonal polynomials!Rodrigues formula">
+
+</a>
+If the function $\rho \left( x\right) $ and the interval [$a$, $b$] are chosen in this way, then the corresponding orthogonal polynomials $q_n\left( x\right) $ are solutions of the differential equation
+$$\frac{\partial}{\partial x}\left( \beta \left( x\right)  \rho \left( x\right)  \left( \frac{\partial}{\partial x}q_n\left( x\right) \right) \right)  - n \left( \alpha _1 + \left( n + 1\right)  \beta _2\right)  q _{n} = 0.$$
+The polynomials $q_n\left( x\right) $ are also given by the Rodrigues formula,
+$$q_n\left( x\right)  = \frac{A _{n}}{\rho \left( x\right) }  \left( \frac{\partial^n}{\partial x ^n}\left( \rho \left( x\right)  \beta \left( x\right)  ^{n}\right) \right) ,$$
+where $A _{n}$ is a normalization constant.
+It is usual to normalize the polynomials so that
+$$\int _{a} ^{b } q_n\left( x\right)  ^{2} \rho \left( x\right)  dx = 1.$$
+The normalization constant $A _{n}$ must be chosen accordingly.
+
+
+<p>
+
+<a name="orthogonal polynomials!generating function">
+
+</a>
+Finally, there is a formula for the generating function of the polynomials,
+$$G\left( x, w\right)  = \frac{1}{\rho \left( x\right) }  \frac{\rho \left( t\left( x, w\right) \right) }{\left| 1 - w \left( \beta _1 + 2 \beta _2 t\left( x, w\right) \right) \right| } ,$$
+where $t\left( x, w\right) $ is the root of $t - x - w \beta \left( t\right)  = 0$ which is nearest to $t = x$ at small $w$.
+This function $G\left( x, w\right) $ gives the unnormalized polynomials,
+$$G\left( x, w\right)  = \sum _{n = 0} ^{\infty } \frac{q_n\left( x\right) }{n!}  w ^{n},$$
+where
+$$q_n\left( x\right)  = \frac{1}{\rho \left( x\right) }  \left( \frac{\partial^n}{\partial x ^n}\left( \rho \left( x\right)  \beta \left( x\right)  ^{n}\right) \right) .$$
+
+
+<p>
+The classical families of (normalized) orthogonal polynomials are obtained in this framework with the following definitions:
+
+
+<p>
+
+<a name="orthogonal polynomials!classical polynomials">
+
+</a>
+<ul><li>The Legendre polynomials </li>$P _{n}\left( x\right) $:
+$a =  - 1$, $b = 1$, $\rho \left( x\right)  = 1$,
+$\alpha \left( x\right)  = 0$,
+$\beta \left( x\right)  = 1 - x ^{2}$,
+$A _{n} = \frac{\left(  - 1\right)  ^{n}}{2 ^{n} n!} $.
+</ul>
+
+<p>
+<ul><li>The Laguerre polynomials </li>$\left( L ^{m}\right) _n\left( x\right) $:
+$a = 0$, $b =  + \infty $, $\rho \left( x\right)  = x ^{m} \exp \left(  - x\right) $, (here $m &gt;  - 1$ or else the weight function is not integrable on the interval),
+$\alpha \left( x\right)  = m - x$,
+$\beta \left( x\right)  = x$,
+$A _{n} = 1$.
+</ul>
+
+<p>
+<ul><li>The Hermite polynomials </li>$H _{n}\left( x\right) $:
+$a =  - \infty $, $b =  + \infty $, $\rho \left( x\right)  = \exp \left(  - x ^{2}\right) $,
+$\alpha \left( x\right)  =  - 2 x$,
+$\beta \left( x\right)  = 1$,
+$A _{n} = \left(  - 1\right)  ^{n}$.
+</ul>
+
+<p>
+<ul><li>The Chebyshev polynomials of the first kind </li>$T _{n}\left( x\right) $:
+$a =  - 1$, $b = 1$, $\rho \left( x\right)  = \frac{1}{\sqrt{1 - x ^{2}}} $,
+$\alpha \left( x\right)  = x$,
+$\beta \left( x\right)  = 1 - x ^{2}$,
+$A _{n} = \frac{\left(  - 1\right)  ^{n}}{\left( 2 n\right) !!} $.
+</ul>
+
+<p>
+The Rodrigues formula or the generating function are not efficient ways to calculate the polynomials.
+A better way is to use linear recurrence relations connecting $q _{n + 1}$ with $q _{n}$ and $q _{n - 1}$.
+(These recurrence relations can also be written out in full generality through $\alpha \left( x\right) $ and $\beta \left( x\right) $ but we shall save the space.)
+
+
+<p>
+There are three computational tasks related to orthogonal polynomials:
+<ul><li>Compute all coefficients of a given polynomial </li>$q_n\left( x\right) $ exactly.
+The coefficients are rational numbers, but their numerators and denominators usually grow exponentially quickly with $n$, so that at least some coefficients of the $n$-th polynomial are $n$-digit numbers.
+The array of coefficients can be obtained using recurrence relations $n$ times.
+The required number of operations is proportional to $n ^{2}$
+(because we need $n$ coefficients and we have $n$ recurrence relations for each of them)
+and to the multiplication time of $n$-digit integers, i.e. $O\left( n ^{2} M\left( n\right) \right) $.
+Sometimes an exact formula for the coefficients is available
+(this is the case for the four "classical" families of polynomials above; see the next section).
+Then the computation time dramatically drops down to $O\left( n ^{2}\right) $ because no recurrences are needed.
+<li>Compute the numerical value of a given polynomial </li>$q_n\left( x\right) $ at given $x$, either exactly (at rational $x$) or approximately in floating point.
+This requires $O\left( n M\left( n\right) \right) $ operations for exact computation and $O\left( n M\left( P\right) \right) $ operations in $P$-digit floating point.
+<li>Compute a series of orthogonal polynomials with given coefficients </li>$f _{n}$, i.e. $f\left( x\right) \equiv \sum _{n = 0} ^{N} f _{n} q_n\left( x\right) $, at a given $x$.
+This task does not actually require computing the polynomials first,
+if we use the so-called Clenshaw-Smith procedure
+which gives the value of $f\left( x\right) $ directly in $n$ iterations.
+(See <a href="Algochapter4.html#c4s10">
+below
+</a>
+ for more explanations.)
+The number of operations is again $O\left( n M\left( P\right) \right) $.
+</ul>
+
+<p>
+In the next section we shall give some formulae that allow to calculate particular polynomials more efficiently.
+
+
+<p>
+
+<a name="c5s10">
+
+</a>
+<h2>
+<hr>5.10 Classical orthogonal polynomials: special cases
+</h2>
+<a name="orthogonal polynomials!by specific formulae">
+
+</a>
+The fastest algorithm available is for Chebyshev (sometimes spelled Tschebyscheff) polynomials $T _{n}\left( x\right) $, $U _{n}\left( x\right) $.
+The following recurrence relations can be used:
+$$T _{2 n}\left( x\right)  = 2 \left( T _{n}\left( x\right) \right)  ^{2} - 1,$$
+$$T _{2 n + 1}\left( x\right)  = 2 T _{n + 1}\left( x\right)  T _{n}\left( x\right)  - x,$$
+$$U _{2 n}\left( x\right)  = 2 T _{n}\left( x\right)  U _{n}\left( x\right)  - 1,$$
+$$U _{2 n + 1}\left( x\right)  = 2 T _{n + 1}\left( x\right)  U _{n}\left( x\right) .$$
+This allows to
+compute $T _{n}\left( x\right) $ and $U _{n}\left( x\right) $ in time logarithmic in $n$.
+
+
+<p>
+There is a way to implement this method without recursion.
+The idea is to build the sequence of numbers $n _{1}$, $n _{2}$, ... that are needed to compute $T _{n}\left( x\right) $.
+
+
+<p>
+For example, to compute $T _{19}\left( x\right) $ using the second recurrence relation, we need $T _{10}\left( x\right) $ and $T _{9}\left( x\right) $.
+We can write this chain symbolically as $19\sim c\left( 9, 10\right) $.
+For $T _{10}\left( x\right) $ we need only $T _{5}\left( x\right) $.
+This we can write as $10\sim c\left( 5\right) $.
+Similarly we find: $9\sim c\left( 4, 5\right) $.
+Therefore, we can find both $T _{9}\left( x\right) $ and $T _{10}\left( x\right) $ if we know $T _{4}\left( x\right) $ and $T _{5}\left( x\right) $.
+Eventually we find the following chain of pairs:
+$$19\sim c\left( 9, 10\right) \sim c\left( 4, 5\right) \sim c\left( 2, 3\right) \sim c\left( 1, 2\right) \sim c\left( 1\right) .$$
+Therefore, we find that $T _{19}\left( x\right) $ requires to compute $T _{k}\left( x\right) $ sequentially for all $k$ that appear in this chain (1,2,3,4,5,9,10).
+
+
+<p>
+There are about $2 \frac{\ln n}{\ln 2} $ elements in the chain that leads to the number $n$.
+We can generate this chain in a straightforward way by examining the bits in the binary representation of $n$.
+Therefore, we find that this method requires no storage and time logarithmic in $n$.
+A recursive routine would also take logarithmic time but require logarithmic storage space.
+
+
+<p>
+Note that using these recurrence relations we do not obtain any individual coefficients of the Chebyshev polynomials.
+This method does not seem very useful for symbolic calculations (with symbolic $x$), because the resulting expressions are rather complicated combinations of nested products.
+It is difficult to expand such an expression into powers of $x$ or manipulate it in any other way, except compute a numerical value.
+However, these fast recurrences are numerically unstable, so numerical values need to be evaluated with extended working precision.
+Currently this method is not used in Yacas, despite its speed.
+
+
+<p>
+An alternative method for very large $n$ would be to use the identities
+$$T _{n}\left( x\right)  = \cos n \arccos x,$$
+$$U _{n}\left( x\right)  = \frac{\sin \left( n + 1\right)  \arccos x}{\sqrt{1 - x ^{2}}} .$$
+The computation will require an extended-precision evaluation of $\arccos x$.
+
+
+<p>
+Coefficients for Legendre, Hermite, Laguerre, Chebyshev polynomials can be obtained by explicit formulae. This is faster than using recurrences if we need the entire polynomial symbolically, but still slower than the recurrences for numerical calculations.
+
+
+<p>
+<ul><li>Chebyshev polynomials of the first and of the second kind:
+If </li>$k = \left\lfloor \frac{n}{2} \right\rfloor $, then
+$$T _{n}\left( x\right)  = \sum _{i = 0} ^{k} \left(  - 1\right)  ^{i} \frac{\left( 2 x\right)  ^{n - 2 i}}{n - i}  {n - i \choose i},$$
+$$U _{n}\left( x\right)  = \sum _{i = 0} ^{k} \left(  - 1\right)  ^{i} \left( 2 x\right)  ^{n - 2 i} {n - i \choose i}.$$
+Here it is assumed that $n &gt; 0$ (the case $n = 0$ must be done separately). The summation is over integer values of $i$ such that $0\leq 2 i\leq n$, regardless of whether $n$ is even or odd.
+</ul>
+
+<p>
+<ul><li>Hermite polynomials:
+For even </li>$n = 2 k$ where $k\geq 0$, 
+$$H _{n}\left( x\right)  = \left(  - 2\right)  ^{k} \left( n - 1\right) !! \sum _{i = 0} ^{k} \frac{x ^{2 i} \left(  - 4\right)  ^{i} k!}{\left( 2 i\right) ! \left( k - i\right) !} ,$$
+and for odd $n = 2 k + 1$ where $k\geq 0$,
+$$H _{n}\left( x\right)  = 2 \left(  - 2\right)  ^{k} n!! \sum _{i = 0} ^{k} \frac{x ^{2 i + 1} \left(  - 4\right)  ^{i} k!}{\left( 2 i + 1\right) ! \left( k - i\right) !} .$$
+</ul>
+
+<p>
+<ul><li>Legendre polynomials:
+If </li>$k = \left\lfloor \frac{n}{2} \right\rfloor $, then
+$$P _{n}\left( x\right)  = 2 ^{ - n} \sum _{i = 0} ^{k} \left(  - 1\right)  ^{i} x ^{n - 2 i} {n \choose i} {2 n - 2 i \choose n}.$$
+The summation is over integer values of $i$ such that $0\leq 2 i\leq n$, regardless of whether $n$ is even or odd.
+</ul>
+
+<p>
+<ul><li>Laguerre polynomials:
+</li>$$\mathrm{ OrthoL }\left( n, a, x\right)  = \sum _{i = 0} ^{n} \frac{\left(  - x\right)  ^{i}}{i!}  {n + a \choose n - i}.$$
+Here the parameter $a$ might be non-integer.
+So the binomial coefficient must be defined for non-integer $a$ through the Gamma function instead of factorials, which gives
+$${n + a \choose n - i} = \frac{\left( n + a\right)  \mathrm{ ... } \left( i + 1 + a\right) }{\left( n - i\right) !} .$$
+The result is a rational function of $a$.
+</ul>
+
+<p>
+In all formulae for the coefficients, there is no need to compute factorials every time:
+the next coefficient can be obtained from the previous one by a few short multiplications and divisions.
+Therefore this computation costs $O\left( n ^{2}\right) $ short operations.
+
+
+<p>
+
+<a name="c5s11">
+
+</a>
+<h2>
+<hr>5.11 Series of orthogonal polynomials
+</h2>
+<a name="orthogonal polynomials!Clenshaw-Smith recurrence">
+
+</a>
+If we need to compute a series of orthogonal polynomials with given coefficients $f _{n}$, i.e.
+$$f\left( x\right) \equiv \sum _{n = 0} ^{N} f _{n} q_n\left( x\right) $$
+at a given $x$, we do not need to compute the orthogonal polynomials separately.
+The Clenshaw-Smith recurrence procedure allows to compute the value of the sum directly.
+
+
+<p>
+Suppose a family of functions $q_n\left( x\right) $,
+$n = 0$, 1, ... satisfies known recurrence relations of the form
+$$q _{n} = A_n\left( x\right)  q _{n - 1} + B_n\left( x\right)  q _{n - 2},$$
+where $A_n\left( x\right) $  and $B_n\left( x\right) $  are some known functions and $q_0\left( x\right) $ and
+$q_1\left( x\right) $ are known.
+
+
+<p>
+The procedure goes as follows [Luke 1975].
+First, for convenience, we define $q _{ - 1}\equiv 0$ and the coefficient $A_1\left( x\right) $  so
+that $q _{1} = A _{1} q _{0}$.
+This allows us to use the above recurrence relation formally also at $n = 1$. 
+Then, we take the array of coefficients $f _{n}$ and define a backward recurrence
+relation
+$$\mathrm{X} _{N + 1} = \mathrm{X} _{N + 2} = 0,$$
+$$\mathrm{X} _{n} = A _{n + 1} \mathrm{X} _{n + 1} + B _{n + 2} \mathrm{X} _{n + 2} + f _{n},$$
+where $n = N$, $N - 1$, ..., 0.
+(Note that here we have used the artificially defined coefficient $A _{1}$.)
+Magically, the value we are looking for is given by 
+$$f\left( x\right)  = \mathrm{X} _{0} q _{0}.$$
+This happens because we can express
+$$f _{n} = \mathrm{X} _{n} - A _{n + 1} \mathrm{X} _{n + 1} - B _{n + 2} \mathrm{X} _{n + 2},$$
+for $n = 0$, 1, ..., $N$,
+regroup the terms in the sum 
+$$f\left( x\right) \equiv \sum _{n = 0} ^{N} f _{n} q_n\left( x\right) $$
+to collect $\mathrm{X} _{n}$, obtain
+$$f\left( x\right)  = \sum _{n = 0} ^{N} \mathrm{X} _{n} q _{n} - \sum _{n = 1} ^{N} \mathrm{X} _{n} A _{n} q _{n - 1} - \sum _{n = 2} ^{N} \mathrm{X} _{n} B _{n} q _{n - 2},$$
+and finally
+$$f\left( x\right)  = \mathrm{X} _{0} q _{0} + \mathrm{X} _{1} \left( q _{1} - A _{1} q _{1}\right) $$
+$$ + \sum _{n = 2} ^{N} \mathrm{X} _{n} \left( q _{n} - A _{n} q _{n - 1} - B _{n} q _{n - 2}\right)  = \mathrm{X} _{0} q _{0}.$$
+
+
+<p>
+The book [Luke 1975] warns that the recurrence relation for $\mathrm{X} _{n}$ is not always numerically stable.
+
+
+<p>
+Note that in the book there seems to be some confusion as 
+to how the coefficient $A _{1}$ is defined.
+(It is not defined explicitly there.)
+Our final formula differs from the formula in [Luke 1975] for this reason.
+
+
+<p>
+The Clenshaw-Smith procedure is analogous to the Horner scheme of calculating polynomials.
+This procedure can also be generalized for linear recurrence relations having
+more than two terms.
+The functions $q_0\left( x\right) $, $q_1\left( x\right) $, $A_n\left( x\right) $, and $B_n\left( x\right) $
+do not actually have to be polynomials for this to work.
+
+
+<p>
+
+
+<script src="http://www.google-analytics.com/urchin.js" type="text/javascript">
+</script>
+<script type="text/javascript">
+_uacct = "UA-2425144-1";
+urchinTracker();
+</script>
+</body>
+
+</html>
