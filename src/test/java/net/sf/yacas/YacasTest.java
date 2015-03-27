@@ -255,11 +255,13 @@ public class YacasTest {
 		try {
 			final StringBuffer buf = new StringBuffer();
 			final YacasInterpreter yacas = new YacasInterpreter(new StringOutput(buf));
-			yacas.Evaluate("Load(\"" + url.toExternalForm() + "\");");
+			final String cmd = "Load(\"" + url.toExternalForm() + "\");";
+			System.out.println("<< " + cmd);
+			System.out.println(">> " + yacas.Evaluate(cmd));
 			if (buf.toString().contains("******************")) {
-				System.err.print(buf.toString());
 				Assert.fail(buf.toString());
 			}
+			System.out.println("------------------------------------------------------------");
 		} catch (final Exception e) {
 			throw new RuntimeException(e);
 		}
