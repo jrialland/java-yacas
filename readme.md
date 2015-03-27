@@ -2,7 +2,7 @@
 yacas
 =====
 
-This is a cleaned-up/mavenized version of java yaCAS 1.3.6 (http://yacas.sourceforge.net/homepage.html)
+A mavenized and cleaned-up version of the java port of the yaCAS computer algebra system, version 1.3.6 (http://yacas.sourceforge.net/homepage.html)
 
 This project is published under the GNU GPL v2 License, as the work it is derived from.
 
