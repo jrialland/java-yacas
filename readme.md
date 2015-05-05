@@ -7,6 +7,7 @@ A mavenized and cleaned-up version of the java port of the yaCAS computer algebr
 This project is published under the GNU GPL v2 License, as the work it is derived from.
 
 [![Build Status](https://travis-ci.org/jrialland/java-yacas.svg)](https://travis-ci.org/jrialland/java-yacas)
+[![Coverage Status](https://img.shields.io/coveralls/jrialland/java-yacas.svg)](https://coveralls.io/r/jrialland/java-yacas)
 
 Sample usage :
 
